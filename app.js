@@ -18,21 +18,23 @@
 /* ---------- config ---------- */
 
 const RARITIES = {
-  common:    { label: 'Common',    color: 'var(--r-common)',    value: 1.2,  mult: 1.0 },
-  rare:      { label: 'Rare',      color: 'var(--r-rare)',      value: 6,    mult: 1.25 },
-  epic:      { label: 'Epic',      color: 'var(--r-epic)',      value: 24,   mult: 1.6 },
-  legendary: { label: 'Legendary', color: 'var(--r-legendary)', value: 120,  mult: 2.1 },
-  mythic:    { label: 'Mythic',    color: 'var(--r-mythic)',    value: 650,  mult: 3.0 },
+  common:    { label: 'Common',    color: 'var(--r-common)',    value: 1.2,   mult: 1.0 },
+  rare:      { label: 'Rare',      color: 'var(--r-rare)',      value: 6,     mult: 1.25 },
+  epic:      { label: 'Epic',      color: 'var(--r-epic)',      value: 24,    mult: 1.6 },
+  legendary: { label: 'Legendary', color: 'var(--r-legendary)', value: 120,   mult: 2.1 },
+  mythic:    { label: 'Mythic',    color: 'var(--r-mythic)',    value: 650,   mult: 3.0 },
+  celestial: { label: 'Celestial', color: 'var(--r-celestial)', value: 5000,  mult: 4.0 },
+  eternal:   { label: 'Eternal',   color: 'var(--r-eternal)',   value: 30000, mult: 5.0 },
 };
 
 /* per-species supply caps per rarity — scarcity is the product */
-const SUPPLY = { common: 500, rare: 200, epic: 75, legendary: 25, mythic: 12 };
+const SUPPLY = { common: 500, rare: 200, epic: 75, legendary: 25, mythic: 12, celestial: 3, eternal: 1 };
 
 const PACKS = {
   standard: { name: 'Standard Pack', price: 4.99, cards: 3,
-              odds: { common: 86, rare: 11.5, epic: 2, legendary: 0.4, mythic: 0.1 } },
+              odds: { common: 86, rare: 11.489, epic: 2, legendary: 0.4, mythic: 0.1, celestial: 0.01, eternal: 0.001 } },
   premium:  { name: 'Premium Pack',  price: 9.99, cards: 5,
-              odds: { common: 70, rare: 21.5, epic: 6.5, legendary: 1.6, mythic: 0.4 } },
+              odds: { common: 70, rare: 21.456, epic: 6.5, legendary: 1.6, mythic: 0.4, celestial: 0.04, eternal: 0.004 } },
 };
 
 const SPECIES = [
@@ -82,7 +84,7 @@ const sPick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 /* ---------- storage ---------- */
 
 const Store = {
-  KEY: 'mint_v5',
+  KEY: 'mint_v6',
   mem: null,
   load() { try { return JSON.parse(localStorage.getItem(this.KEY)) || null; } catch { return this.mem; } },
   save(s) { this.mem = s; try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch {} },
@@ -98,12 +100,15 @@ let S = Store.load() || {
 };
 if (!S.economy) {
   S.economy = {
-    r: Object.fromEntries(Object.keys(RARITIES).map(k => [k, 1])),
-    sp: Object.fromEntries(SPECIES.map(s => [s.id, 1])),
-    drift: Object.fromEntries(Object.keys(RARITIES).map(k => [k, 0])),
-    spDrift: Object.fromEntries(SPECIES.map(s => [s.id, 0])),
+    r: {}, sp: Object.fromEntries(SPECIES.map(s => [s.id, 1])),
+    drift: {}, spDrift: Object.fromEntries(SPECIES.map(s => [s.id, 0])),
     hist: [100],
   };
+}
+// migration: ensure every rarity tier has index + drift entries
+for (const k of Object.keys(RARITIES)) {
+  if (S.economy.r[k] == null) S.economy.r[k] = 1;
+  if (S.economy.drift[k] == null) S.economy.drift[k] = 0;
 }
 const persist = () => Store.save(S);
 
@@ -183,7 +188,7 @@ function rollRarity(odds) {
   return 'common';
 }
 
-const RARITY_ORDER = ['mythic', 'legendary', 'epic', 'rare', 'common'];
+const RARITY_ORDER = ['eternal', 'celestial', 'mythic', 'legendary', 'epic', 'rare', 'common'];
 
 function mintCreature(rarity) {
   // find a species with supply left at this tier; otherwise fall back down the tiers
@@ -390,8 +395,9 @@ function svgFor(c) {
   if (acc === 3) accessory = `<path d="M${cx - 6},${cy - r - 3} q-6,-6 -10,0 q4,6 10,0 Z M${cx - 6},${cy - r - 3} q6,-6 10,0 q-4,6 -10,0 Z" fill="#f7a8bc" stroke="#e786a3" stroke-width="1.2"/><circle cx="${cx - 6}" cy="${cy - r - 3}" r="2" fill="#fff"/>`;
 
   let flair = '';
-  if (['legendary', 'mythic'].includes(c.rarity)) {
-    const ring = c.rarity === 'mythic' ? 'url(#rainbow)' : '#e5b345';
+  if (['legendary', 'mythic', 'celestial', 'eternal'].includes(c.rarity)) {
+    const ring = c.rarity === 'legendary' ? '#e5b345' : c.rarity === 'mythic' ? 'url(#rainbow)' :
+                 c.rarity === 'celestial' ? '#5ce1e6' : '#f4d58d';
     flair = `<circle cx="${cx}" cy="${cy}" r="52" fill="none" stroke="${ring}" stroke-width="1.8" stroke-dasharray="5 6" opacity=".85">
       <animateTransform attributeName="transform" type="rotate" from="0 ${cx} ${cy}" to="360 ${cx} ${cy}" dur="12s" repeatCount="indefinite"/>
     </circle>`;
@@ -492,14 +498,7 @@ $('#depositContinue').addEventListener('click', () => {
 });
 
 function openWithdraw() {
-  const amt = S.balance;
-  if (amt < 0.01) return toast('Nothing to withdraw yet');
-  PaySheet.open([{ name: 'Transfer to bank ···· 8231', price: amt }], amt, () => {
-    S.balance = 0;
-    log('⤓', 'Withdrawal', 'To bank ···· 8231', -amt);
-    toast(`${money(amt)} on its way to your bank`);
-    renderAll();
-  }, { allowBalance: false });
+  toast('Withdrawals are coming soon — your balance is safe here for now');
 }
 $('#withdrawBtn').addEventListener('click', openWithdraw);
 $('#walletWithdraw').addEventListener('click', openWithdraw);
@@ -523,7 +522,6 @@ function toast(msg) {
 
 function renderWallet() {
   $('#balance').textContent = money(S.balance);
-  $('#withdrawBtn').disabled = S.balance < 0.01;
   $('#collCount').textContent = S.collection.length;
 }
 
@@ -539,7 +537,7 @@ function supplyBadge(c) {
 function monCardHTML(c, actions) {
   const r = RARITIES[c.rarity];
   const cls = ['mon-card', `frame-${c.rarity}`, c.rarity === 'mythic' ? 'mythic-sheen' : ''].join(' ');
-  const orn = ['legendary', 'mythic'].includes(c.rarity)
+  const orn = ['legendary', 'mythic', 'celestial', 'eternal'].includes(c.rarity)
     ? '<i class="orn tl"></i><i class="orn tr"></i><i class="orn bl"></i><i class="orn br"></i>' : '';
   return `<article class="${cls}" style="${cardVars(c)}" data-tilt data-id="${c.id}">
     <div class="card-face">
@@ -640,9 +638,13 @@ function renderActivity() {
     </div>`).join('') || '<div class="act-empty">No activity yet. Your deposits, purchases and sales appear here.</div>';
 }
 
+function oddsLabel(pct) {
+  if (pct >= 1) return pct + '%';
+  return '1 in ' + Math.round(100 / pct).toLocaleString('en-NZ');
+}
 function renderOdds() {
   $('#oddsTable').innerHTML = Object.keys(RARITIES).map(k =>
-    `<span><i style="background:${RARITIES[k].color}"></i>${RARITIES[k].label} <small>${PACKS.standard.odds[k]}% / ${PACKS.premium.odds[k]}%</small></span>`).join('');
+    `<span><i style="background:${RARITIES[k].color}"></i>${RARITIES[k].label} <small>${oddsLabel(PACKS.standard.odds[k])} / ${oddsLabel(PACKS.premium.odds[k])}</small></span>`).join('');
   $('#supplyNote').innerHTML = Object.keys(SUPPLY).map(k =>
     `<span style="color:${RARITIES[k].color}">${RARITIES[k].label}: <b>${SUPPLY[k]}</b>/species</span>`).join(' · ');
 }
@@ -753,7 +755,7 @@ function showReveal() {
   $('#revealStage').classList.add('on');
   $('#revealRow').innerHTML = pendingPack.map((c, i) => {
     const r = RARITIES[c.rarity];
-    const epicplus = ['epic', 'legendary', 'mythic'].includes(c.rarity) ? ' epicplus' : '';
+    const epicplus = !['common', 'rare'].includes(c.rarity) ? ' epicplus' : '';
     return `<div class="reveal-card${epicplus}" data-i="${i}" style="${cardVars(c)};--d:${(i * 0.09).toFixed(2)}s">
       <div class="reveal-inner">
         <div class="reveal-face reveal-back"><div class="gem"></div></div>
@@ -775,10 +777,12 @@ function flipCard(card) {
   card.classList.add('flipped');
   const c = pendingPack[+card.dataset.i];
   card.insertAdjacentHTML('beforeend', '<span class="flash"></span>');
-  if (['legendary', 'mythic'].includes(c.rarity)) {
+  if (['legendary', 'mythic', 'celestial', 'eternal'].includes(c.rarity)) {
     card.insertAdjacentHTML('beforeend', confettiHTML());
-    $('#revealScrim').classList.add(c.rarity === 'mythic' ? 'prism' : 'goldglow');
-    setTimeout(() => $('#revealScrim').classList.remove('prism', 'goldglow'), 1400);
+    const fx = { legendary: 'goldglow', mythic: 'prism', celestial: 'aurora', eternal: 'eternalflash' }[c.rarity];
+    $('#revealScrim').classList.add(fx);
+    setTimeout(() => $('#revealScrim').classList.remove('goldglow', 'prism', 'aurora', 'eternalflash'), c.rarity === 'eternal' ? 2600 : 1400);
+    if (c.rarity === 'eternal') toast('AN ETERNAL. One of one. It will never exist again.');
   }
 }
 

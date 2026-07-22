@@ -22,6 +22,8 @@
   --r-epic:#b48be8;
   --r-legendary:#e5b345;
   --r-mythic:#f2799f;
+  --r-celestial:#2bbfd4;
+  --r-eternal:#c9a227;
   --font:-apple-system,BlinkMacSystemFont,'SF Pro Display','Inter',sans-serif;
   --font-cute:'Baloo 2','SF Pro Rounded',var(--font);
   --shadow-sm:0 1px 3px rgba(90,70,110,.07),0 1px 2px rgba(90,70,110,.05);
@@ -697,4 +699,86 @@ input[type="search"]{width:190px}
   .index-bar{padding:10px 12px;gap:10px}
   .trend-strip{margin-left:0;width:100%}
   #sparkline{margin-left:auto}
+}
+
+/* ============ v6: Celestial & Eternal ============ */
+/* celestial — aurora border + drifting starlight */
+.frame-celestial .card-face,
+.detail-card.frame-celestial{
+  border-color:transparent;
+  background:
+    radial-gradient(2px 2px at 22% 18%, rgba(92,225,230,.7), transparent 60%),
+    radial-gradient(1.6px 1.6px at 78% 26%, rgba(180,139,232,.6), transparent 60%),
+    radial-gradient(2px 2px at 64% 86%, rgba(92,225,230,.55), transparent 60%),
+    linear-gradient(var(--pastel),var(--pastel)) padding-box,
+    linear-gradient(120deg,#5ce1e6,#7cb8f7 35%,#b48be8 70%,#5ce1e6) border-box;
+  animation:auroraGlow 3s ease-in-out infinite;
+}
+@keyframes auroraGlow{
+  0%,100%{box-shadow:0 6px 26px rgba(92,225,230,.4)}
+  50%{box-shadow:0 6px 38px rgba(124,184,247,.55)}
+}
+.frame-celestial .card-face::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(160deg,rgba(92,225,230,.16),transparent 40%,rgba(180,139,232,.16) 75%);
+  background-size:100% 300%;animation:auroraDrift 5s ease-in-out infinite alternate;
+}
+@keyframes auroraDrift{from{background-position:0 0}to{background-position:0 100%}}
+.frame-celestial .orn{border-color:#5ce1e6}
+.frame-celestial .card-mint{color:#1d97a8}
+
+/* eternal — obsidian card, gilded type, living gold shimmer */
+.frame-eternal .card-face,
+.detail-card.frame-eternal{
+  border-color:transparent;
+  background:
+    radial-gradient(1.8px 1.8px at 24% 22%, rgba(244,213,141,.9), transparent 60%),
+    radial-gradient(1.4px 1.4px at 76% 30%, rgba(244,213,141,.7), transparent 60%),
+    radial-gradient(1.8px 1.8px at 60% 88%, rgba(244,213,141,.6), transparent 60%),
+    linear-gradient(150deg,#191627,#221d35 55%,#161322) padding-box,
+    linear-gradient(120deg,#c9a227,#f4d58d 30%,#c9a227 55%,#f4d58d 80%,#c9a227) border-box;
+  animation:eternalGlow 3.4s ease-in-out infinite;
+}
+@keyframes eternalGlow{
+  0%,100%{box-shadow:0 0 0 1px rgba(201,162,39,.5),0 8px 30px rgba(201,162,39,.45)}
+  50%{box-shadow:0 0 0 1px rgba(244,213,141,.8),0 8px 46px rgba(244,213,141,.65)}
+}
+.frame-eternal .card-face::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,transparent 35%,rgba(244,213,141,.28) 50%,transparent 65%);
+  background-size:280% 100%;animation:sheen 2.6s linear infinite;
+}
+.frame-eternal .card-face::before,
+.detail-card.frame-eternal::before{border-color:rgba(244,213,141,.45)}
+.frame-eternal .card-mint{color:#f4d58d}
+.frame-eternal .card-name,.detail-card.frame-eternal h3{color:#f8f2df}
+.frame-eternal .card-epithet,.detail-card.frame-eternal .card-epithet{color:#cbbfa0}
+.frame-eternal .card-foot{color:#a99b74}
+.detail-card.frame-eternal .serial{color:#cbbfa0}
+.detail-card.frame-eternal .statbar{color:#a99b74}
+.detail-card.frame-eternal .statbar span:last-child{color:#f8f2df}
+.detail-card.frame-eternal .statbar .bar{background:rgba(255,255,255,.12)}
+.frame-eternal .card-vignette{
+  background:radial-gradient(circle at 50% 42%,#2e2745 55%,#221d35);
+  border-color:#c9a227;
+}
+.frame-eternal .orn{border-color:#f4d58d}
+.frame-eternal .actions .btn-quiet{background:rgba(255,255,255,.12);color:#f8f2df}
+
+/* reveal scrim flashes */
+.scrim.dark.aurora{animation:auroraFlash 1.4s ease}
+@keyframes auroraFlash{
+  0%{background:rgba(38,30,48,.94)}
+  30%{background:rgba(24,86,96,.92)}
+  60%{background:rgba(58,60,120,.92)}
+  100%{background:rgba(38,30,48,.94)}
+}
+.scrim.dark.eternalflash{animation:eternalFlash 2.6s ease}
+@keyframes eternalFlash{
+  0%{background:rgba(38,30,48,.94)}
+  15%{background:rgba(10,8,16,.98)}
+  35%{background:rgba(90,70,18,.95)}
+  55%{background:rgba(10,8,16,.98)}
+  75%{background:rgba(120,96,28,.95)}
+  100%{background:rgba(38,30,48,.94)}
 }

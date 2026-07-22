@@ -114,3 +114,18 @@ block at the top of `app.js`.
 - **Art v2**: radial-gradient shading, per-species backdrop motifs (floral
   wreath, honeycomb, crescent moon, clock ring, waves, clouds, leaf ring,
   starfields), and little paws for the bust look.
+
+## v6 additions
+
+- **Withdrawals gated**: both withdraw buttons read "Withdraw · Coming soon" and
+  show a friendly toast instead of the payout sheet.
+- **Celestial & Eternal tiers**: Celestial — 1-in-10,000 Standard odds
+  (1-in-2,500 Premium), 3 per species, aurora teal/violet animated frame with
+  drifting starlight and its own reveal flash. Eternal — 1-in-100,000 Standard
+  odds (1-in-25,000 Premium), a true one-of-one per species, rendered as an
+  obsidian card with gilded type, gold-dust sparkle, living shimmer, an extended
+  black-and-gold reveal sequence, and a toast announcing the 1/1. Odds under 1%
+  display as "1 in N" in the odds table. Bots never list either tier — packs are
+  the only source.
+- **Favicon**: kawaii bunny + sprout on a pastel gradient tile (favicon.svg,
+  favicon-32.png, apple-touch-icon.png).
