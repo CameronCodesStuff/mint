@@ -782,3 +782,87 @@ input[type="search"]{width:190px}
   75%{background:rgba(120,96,28,.95)}
   100%{background:rgba(38,30,48,.94)}
 }
+
+/* ============ v7: pack art & auto-reveal hype ============ */
+.pack-art{display:grid;place-items:center;height:100%}
+.pack-svg{height:150px;filter:drop-shadow(0 12px 24px rgba(90,70,110,.25));animation:packBob 4s ease-in-out infinite}
+@keyframes packBob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-7px) rotate(2deg)}}
+.pack-card:hover .pack-svg{animation-duration:1.6s}
+
+.open-pack-wrap{position:relative;width:190px;height:250px;display:grid;place-items:center}
+.open-pack-wrap .pack-svg{height:230px;animation:packHype 1.05s cubic-bezier(.36,.07,.19,.97) forwards}
+@keyframes packHype{
+  0%{transform:scale(.9) rotate(0)}
+  20%{transform:scale(1) rotate(-3deg)}
+  35%{transform:scale(1.02) rotate(3deg)}
+  50%{transform:scale(1.05) rotate(-4deg)}
+  62%{transform:scale(1.08) rotate(4deg)}
+  74%{transform:scale(1.12) rotate(-5deg);filter:drop-shadow(0 0 22px rgba(255,255,255,.45))}
+  86%{transform:scale(1.16) rotate(5deg);filter:drop-shadow(0 0 34px rgba(255,255,255,.7))}
+  100%{transform:scale(1.2) rotate(0);filter:drop-shadow(0 0 46px rgba(255,255,255,.9)) brightness(1.5)}
+}
+.open-pack-wrap.bursting .pack-svg{animation:packBurst .55s ease forwards}
+@keyframes packBurst{
+  40%{transform:scale(1.35);filter:brightness(2.4)}
+  100%{transform:scale(0);opacity:0;filter:brightness(3)}
+}
+.open-pack-wrap.bursting .gem-burst i{animation:fly .8s cubic-bezier(.1,.7,.3,1) .18s forwards}
+
+.pack-value{
+  display:inline-flex;align-items:baseline;gap:9px;margin-bottom:18px;
+  background:rgba(255,255,255,.12);border-radius:99px;padding:8px 20px;backdrop-filter:blur(8px);
+}
+.pack-value small{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.65)}
+.pack-value b{font-family:var(--font-cute);font-size:22px;font-weight:800;color:#fff;font-variant-numeric:tabular-nums}
+
+/* rarity pre-glow: the anticipation beat before a flip */
+.reveal-card.charging .reveal-inner{transform:translateY(-8px) scale(1.05)}
+.reveal-card.charging .reveal-back{
+  border:2px solid var(--rc);
+  animation:chargePulse .55s ease-in-out infinite;
+}
+@keyframes chargePulse{
+  0%,100%{box-shadow:0 0 14px color-mix(in srgb,var(--rc) 55%,transparent)}
+  50%{box-shadow:0 0 38px color-mix(in srgb,var(--rc) 95%,transparent)}
+}
+.reveal-card.big-charge .reveal-back .gem{animation:gemSpinFast .5s linear infinite}
+@keyframes gemSpinFast{from{transform:rotate(45deg)}to{transform:rotate(405deg)}}
+.reveal-row.shake{animation:rowShake .45s ease}
+@keyframes rowShake{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-7px)}40%{transform:translateX(7px)}
+  60%{transform:translateX(-4px)}80%{transform:translateX(4px)}
+}
+.value-tag{
+  position:absolute;top:-8px;left:50%;transform:translateX(-50%);
+  font-family:var(--font-cute);font-weight:800;font-size:14px;color:#fff;
+  background:var(--green);border-radius:99px;padding:3px 11px;z-index:4;
+  box-shadow:0 4px 14px rgba(76,191,135,.5);
+  animation:tagPop 1.6s cubic-bezier(.2,.8,.3,1.1) both;
+}
+@keyframes tagPop{
+  0%{opacity:0;transform:translateX(-50%) translateY(8px) scale(.6)}
+  18%{opacity:1;transform:translateX(-50%) translateY(-6px) scale(1.08)}
+  30%{transform:translateX(-50%) translateY(-4px) scale(1)}
+  80%{opacity:1}
+  100%{opacity:0;transform:translateX(-50%) translateY(-18px)}
+}
+.reveal-summary{min-height:64px;margin-bottom:16px;color:#fff}
+.sum-line{font-size:14px;margin-top:4px}
+.sum-line b{font-family:var(--font-cute)}
+.sum-line.dim{color:rgba(255,255,255,.6);font-size:12.5px}
+.sum-vibe{
+  font-family:var(--font-cute);font-weight:800;font-size:21px;letter-spacing:.02em;
+  background:linear-gradient(100deg,#8fd7b0,#7cb8f7 40%,#f2799f 80%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  animation:vibeIn .5s cubic-bezier(.2,.8,.3,1.2) both;
+}
+@keyframes vibeIn{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:scale(1)}}
+.btn-mint{background:var(--green);color:#fff}
+.btn-mint:hover{opacity:.9;box-shadow:0 6px 18px rgba(76,191,135,.4)}
+.btn-mint:disabled,.reveal-actions .btn:disabled{opacity:.35}
+
+@media (max-width:560px){
+  .open-pack-wrap .pack-svg{height:190px}
+  .pack-value b{font-size:19px}
+}

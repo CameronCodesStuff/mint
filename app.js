@@ -423,6 +423,100 @@ function cardVars(c) {
   return `--rc:${RARITIES[c.rarity].color};--pastel:hsl(${sp.hue} 72% 93%);--frame:hsl(${sp.hue} 46% 72%)`;
 }
 
+/* ---------- pack art ---------- */
+
+function packSVG(kind) {
+  const premium = kind === 'premium';
+  const bodyFill = premium ? 'url(#pkDark)' : 'url(#pkMint)';
+  const crimp = premium ? '#c9a227' : '#8fd7b0';
+  const emblemBg = premium ? '#2e2745' : '#ffffff';
+  const label = premium ? '#f4d58d' : '#3aa572';
+  const foil = premium
+    ? `<path d="M14 34 L106 96 L106 116 L14 54 Z" fill="url(#pkRainbow)" opacity=".55"/>
+       <path d="M14 60 L106 122 L106 132 L14 70 Z" fill="url(#pkRainbow)" opacity=".3"/>`
+    : `<path d="M14 40 L106 92 L106 104 L14 52 Z" fill="#ffffff" opacity=".28"/>`;
+  const star = premium ? `<text x="92" y="34" font-size="13" fill="#f4d58d">✦</text><text x="20" y="140" font-size="9" fill="#f4d58d" opacity=".8">✦</text>`
+                       : `<text x="92" y="34" font-size="11" fill="#ffffff" opacity=".9">✦</text>`;
+  const zig = (y, flip) => {
+    let d = `M14 ${y}`;
+    for (let x = 14; x < 106; x += 8) d += ` L${x + 4} ${y + (flip ? 6 : -6)} L${x + 8} ${y}`;
+    return d;
+  };
+  return `<svg viewBox="0 0 120 168" xmlns="http://www.w3.org/2000/svg" class="pack-svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="pkMint" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#bfe9d4"/><stop offset=".55" stop-color="#a8d8f0"/><stop offset="1" stop-color="#cfd4f5"/>
+      </linearGradient>
+      <linearGradient id="pkDark" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#2a2440"/><stop offset=".6" stop-color="#1c1830"/><stop offset="1" stop-color="#241f38"/>
+      </linearGradient>
+      <linearGradient id="pkRainbow" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#7cb8f7"/><stop offset=".33" stop-color="#b48be8"/><stop offset=".66" stop-color="#f2799f"/><stop offset="1" stop-color="#e5b345"/>
+      </linearGradient>
+    </defs>
+    <path d="${zig(14, true)} L106 14 L106 8 L14 8 Z" fill="${crimp}"/>
+    <rect x="14" y="14" width="92" height="132" rx="8" fill="${bodyFill}"/>
+    ${foil}
+    <path d="${zig(152, false)} L106 152 L106 158 L14 158 Z" fill="${crimp}"/>
+    <rect x="14" y="146" width="92" height="6" fill="${crimp}"/>
+    ${star}
+    <circle cx="60" cy="76" r="25" fill="${emblemBg}" stroke="${crimp}" stroke-width="2.5"/>
+    <g transform="translate(60,76) scale(1.7) translate(-12,-13)">
+      <path d="M12 22c0-5.5 0-8.5 0-10" fill="none" stroke="#3aa572" stroke-width="2" stroke-linecap="round"/>
+      <path d="M12 12C12 6.5 15.5 3.5 20 3.5 20 9 16.5 12 12 12Z" fill="#4cbf87"/>
+      <path d="M12 12C12 6.5 8.5 3.5 4 3.5 4 9 7.5 12 12 12Z" fill="#6fd6a3"/>
+    </g>
+    <text x="60" y="126" text-anchor="middle" font-family="'Baloo 2',sans-serif" font-weight="800" font-size="15" letter-spacing="4" fill="${label}">MINT</text>
+    <text x="60" y="139" text-anchor="middle" font-family="'Baloo 2',sans-serif" font-weight="700" font-size="7" letter-spacing="2" fill="${label}" opacity=".75">${premium ? '5 CARDS' : '3 CARDS'}</text>
+  </svg>`;
+}
+
+/* ---------- tiny sound engine (WebAudio, no assets) ---------- */
+
+const Sfx = {
+  ctx: null,
+  get() {
+    if (!this.ctx) { try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch {} }
+    return this.ctx;
+  },
+  tone(freq, t0, dur, vol = 0.12, type = 'sine') {
+    const ctx = this.get(); if (!ctx) return;
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, ctx.currentTime + t0);
+    g.gain.exponentialRampToValueAtTime(vol, ctx.currentTime + t0 + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + t0 + dur);
+    o.connect(g).connect(ctx.destination);
+    o.start(ctx.currentTime + t0); o.stop(ctx.currentTime + t0 + dur + 0.05);
+  },
+  rip() { // filtered noise burst
+    const ctx = this.get(); if (!ctx) return;
+    const len = 0.35, buf = ctx.createBuffer(1, ctx.sampleRate * len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / d.length);
+    const s = ctx.createBufferSource(); s.buffer = buf;
+    const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 900;
+    const g = ctx.createGain(); g.gain.value = 0.22;
+    s.connect(f).connect(g).connect(ctx.destination); s.start();
+  },
+  reveal(rarity) {
+    const seqs = {
+      common:    [[523, .12]],
+      rare:      [[523, .1], [659, .16]],
+      epic:      [[523, .09], [659, .09], [784, .2]],
+      legendary: [[523, .09], [659, .09], [784, .09], [1047, .3]],
+      mythic:    [[392, .1], [523, .1], [659, .1], [784, .1], [1047, .38]],
+      celestial: [[440, .1], [554, .1], [659, .1], [880, .12], [1109, .4]],
+      eternal:   [[262, .18], [330, .14], [392, .14], [523, .16], [659, .16], [1047, .55]],
+    };
+    (seqs[rarity] || seqs.common).forEach(([f, d], i) => {
+      this.tone(f, i * 0.09, d, 0.13, 'triangle');
+      if (['legendary','mythic','celestial','eternal'].includes(rarity)) this.tone(f / 2, i * 0.09, d, 0.06, 'sine');
+    });
+    if (rarity === 'eternal') this.tone(65, 0, 1.2, 0.16, 'sine');
+  },
+};
+
 /* ---------- payment sheet (balance-aware) ---------- */
 
 const PaySheet = {
@@ -706,9 +800,14 @@ document.addEventListener('pointerout', e => {
   }
 });
 
-/* ---------- pack opening ---------- */
+/* ---------- pack opening: auto-reveal hype sequence ---------- */
 
 let pendingPack = null;
+let lastPackKey = null;
+let speedMult = 1;
+const sleep = ms => new Promise(res => setTimeout(res, ms * speedMult));
+
+const CHARGE_MS = { common: 420, rare: 620, epic: 1000, legendary: 1500, mythic: 2100, celestial: 2400, eternal: 3000 };
 
 function buyPack(key) {
   const pack = PACKS[key];
@@ -716,47 +815,49 @@ function buyPack(key) {
     [{ name: `MINT · ${pack.name}`, price: pack.price }],
     pack.price,
     (usedBalance) => {
+      lastPackKey = key;
       pendingPack = Array.from({ length: pack.cards }, () => mintCreature(rollRarity(pack.odds)));
       log('◆', pack.name, usedBalance ? 'MINT Balance' : 'Card ···· 4242', -pack.price);
       persist();
-      openRevealIntro();
+      runOpenSequence(key);
     }
   );
 }
 
-function openRevealIntro() {
+async function runOpenSequence(packKey) {
+  speedMult = 1;
   $('#revealScrim').classList.add('open');
   $('#openIntro').style.display = '';
   $('#revealStage').classList.remove('on');
-  const wrap = $('#openGemWrap');
-  wrap.classList.remove('cracking');
-  $('#gemBurst').innerHTML = Array.from({ length: 18 }, () => {
+  $('#revealSummary').innerHTML = '';
+  $('#revealDone').disabled = true;
+  $('#openAnother').disabled = true;
+  $('#packValueNum').textContent = '$0.00';
+
+  const wrap = $('#openPackWrap');
+  wrap.classList.remove('bursting');
+  $('#openPackArt').innerHTML = packSVG(packKey);
+  $('#openHint').textContent = 'Opening…';
+  $('#gemBurst').innerHTML = Array.from({ length: 22 }, () => {
     const a = Math.random() * Math.PI * 2;
-    const d = 90 + Math.random() * 130;
+    const d = 100 + Math.random() * 140;
     return `<i style="--c:${pick(BURST_COLORS)};--dx:${(Math.cos(a) * d).toFixed(0)}px;--dy:${(Math.sin(a) * d).toFixed(0)}px"></i>`;
   }).join('');
-  wrap.onclick = () => {
-    wrap.classList.add('cracking');
-    wrap.onclick = null;
-    setTimeout(showReveal, 700);
-  };
+
+  await sleep(1050);            // pack wiggles + charges
+  Sfx.rip();
+  wrap.classList.add('bursting');
+  await sleep(560);
+  autoReveal();
 }
 
-function confettiHTML() {
-  return `<span class="confetti">${Array.from({ length: 16 }, () => {
-    const a = Math.random() * Math.PI * 2;
-    const d = 70 + Math.random() * 90;
-    return `<i style="--c:${pick(BURST_COLORS)};--dx:${(Math.cos(a) * d).toFixed(0)}px;--dy:${(Math.sin(a) * d).toFixed(0)}px"></i>`;
-  }).join('')}</span>`;
-}
-
-function showReveal() {
+function autoReveal() {
   $('#openIntro').style.display = 'none';
-  $('#revealStage').classList.add('on');
+  const stage = $('#revealStage');
+  stage.classList.add('on');
   $('#revealRow').innerHTML = pendingPack.map((c, i) => {
     const r = RARITIES[c.rarity];
-    const epicplus = !['common', 'rare'].includes(c.rarity) ? ' epicplus' : '';
-    return `<div class="reveal-card${epicplus}" data-i="${i}" style="${cardVars(c)};--d:${(i * 0.09).toFixed(2)}s">
+    return `<div class="reveal-card" data-i="${i}" style="${cardVars(c)};--d:${(i * 0.09).toFixed(2)}s">
       <div class="reveal-inner">
         <div class="reveal-face reveal-back"><div class="gem"></div></div>
         <div class="reveal-face reveal-front frame-${c.rarity}">
@@ -769,35 +870,98 @@ function showReveal() {
       </div>
     </div>`;
   }).join('');
-  $$('.reveal-card').forEach(card => card.addEventListener('click', () => flipCard(card), { once: true }));
+  // tap anywhere in the row to fast-forward the drama
+  $('#revealRow').onclick = () => { speedMult = 0.25; };
+  runFlipSequence();
 }
 
-function flipCard(card) {
+async function runFlipSequence() {
+  let total = 0;
+  const cards = $$('.reveal-card');
+  await sleep(500 + pendingPack.length * 90);
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i];
+    const c = pendingPack[i];
+    card.classList.add('charging');            // rarity pre-glow: the "something's coming" beat
+    if (!['common', 'rare'].includes(c.rarity)) card.classList.add('big-charge');
+    await sleep(CHARGE_MS[c.rarity]);
+    card.classList.remove('charging', 'big-charge');
+    flipCard(card, c);
+    total = round2(total + fairValue(c));
+    animateValue(total);
+    await sleep(520);
+  }
+  finishReveal(total);
+}
+
+let valueAnim = null;
+function animateValue(target) {
+  cancelAnimationFrame(valueAnim);
+  const el = $('#packValueNum');
+  const from = parseFloat(el.textContent.replace('$', '')) || 0;
+  const t0 = performance.now(), dur = 420;
+  const step = now => {
+    const p = Math.min(1, (now - t0) / dur);
+    el.textContent = money(from + (target - from) * (1 - Math.pow(1 - p, 3)));
+    if (p < 1) valueAnim = requestAnimationFrame(step);
+  };
+  valueAnim = requestAnimationFrame(step);
+}
+
+function flipCard(card, c) {
   if (card.classList.contains('flipped')) return;
+  const r = c.rarity;
   card.classList.add('flipped');
-  const c = pendingPack[+card.dataset.i];
+  if (!['common', 'rare'].includes(r)) card.classList.add('epicplus');
   card.insertAdjacentHTML('beforeend', '<span class="flash"></span>');
-  if (['legendary', 'mythic', 'celestial', 'eternal'].includes(c.rarity)) {
+  card.insertAdjacentHTML('beforeend', `<span class="value-tag">+${money(fairValue(c))}</span>`);
+  Sfx.reveal(r);
+  if (['epic', 'legendary', 'mythic', 'celestial', 'eternal'].includes(r)) {
     card.insertAdjacentHTML('beforeend', confettiHTML());
-    const fx = { legendary: 'goldglow', mythic: 'prism', celestial: 'aurora', eternal: 'eternalflash' }[c.rarity];
+    $('#revealRow').classList.add('shake');
+    setTimeout(() => $('#revealRow').classList.remove('shake'), 500);
+  }
+  const fx = { legendary: 'goldglow', mythic: 'prism', celestial: 'aurora', eternal: 'eternalflash' }[r];
+  if (fx) {
     $('#revealScrim').classList.add(fx);
-    setTimeout(() => $('#revealScrim').classList.remove('goldglow', 'prism', 'aurora', 'eternalflash'), c.rarity === 'eternal' ? 2600 : 1400);
-    if (c.rarity === 'eternal') toast('AN ETERNAL. One of one. It will never exist again.');
+    setTimeout(() => $('#revealScrim').classList.remove('goldglow', 'prism', 'aurora', 'eternalflash'), r === 'eternal' ? 2600 : 1400);
+    if (r === 'eternal') toast('AN ETERNAL. One of one. It will never exist again.');
   }
 }
 
-$('#revealAll').addEventListener('click', () => {
-  $$('.reveal-card:not(.flipped)').forEach((card, i) => setTimeout(() => flipCard(card), i * 220));
-});
+function finishReveal(total) {
+  const pack = PACKS[lastPackKey];
+  const best = pendingPack.reduce((a, b) => RARITIES[b.rarity].value > RARITIES[a.rarity].value ? b : a);
+  const mult = total / pack.price;
+  const vibe = mult >= 3 ? 'INSANE PULL' : mult >= 1.5 ? 'Great pack!' : mult >= 0.8 ? 'Solid pack' : 'Better luck next pack';
+  $('#revealSummary').innerHTML = `
+    <div class="sum-line"><span class="sum-vibe">${vibe}</span></div>
+    <div class="sum-line">Best pull: <b style="color:${RARITIES[best.rarity].color}">${best.name}</b> · ${RARITIES[best.rarity].label}</div>
+    <div class="sum-line dim">Pack value ${money(total)} · you paid ${money(pack.price)} (${mult.toFixed(1)}×)</div>`;
+  $('#revealDone').disabled = false;
+  const again = $('#openAnother');
+  again.disabled = false;
+  again.textContent = `Open another · ${money(pack.price)}`;
+}
 
-$('#revealDone').addEventListener('click', () => {
+function bankPack() {
   if (!pendingPack) return;
   S.collection.push(...pendingPack);
   const best = pendingPack.reduce((a, b) => RARITIES[b.rarity].value > RARITIES[a.rarity].value ? b : a);
   toast(`${pendingPack.length} critters minted — best pull: ${best.name} (${RARITIES[best.rarity].label})`);
   pendingPack = null;
-  $('#revealScrim').classList.remove('open');
   renderAll();
+}
+
+$('#revealDone').addEventListener('click', () => {
+  bankPack();
+  $('#revealScrim').classList.remove('open');
+});
+
+$('#openAnother').addEventListener('click', () => {
+  bankPack();
+  $('#revealScrim').classList.remove('open');
+  buyPack(lastPackKey);
 });
 
 /* ---------- market ---------- */
@@ -979,6 +1143,8 @@ $('#speciesFilter').addEventListener('change', renderMarket);
 
 $('#speciesFilter').insertAdjacentHTML('beforeend',
   SPECIES.map(sp => `<option value="${sp.id}">${sp.label}</option>`).join(''));
+$('#packArtStandard').innerHTML = packSVG('standard');
+$('#packArtPremium').innerHTML = packSVG('premium');
 seedMarket();
 renderOdds();
 renderHero();

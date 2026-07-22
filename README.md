@@ -129,3 +129,24 @@ block at the top of `app.js`.
   the only source.
 - **Favicon**: kawaii bunny + sprout on a pastel gradient tile (favicon.svg,
   favicon-32.png, apple-touch-icon.png).
+
+## v7 — auto-open hype & branding
+
+- **Auto-opening packs**: no taps needed. Payment clears → the actual pack art
+  wiggles, charges with a white glow, and bursts (with a WebAudio rip sound) →
+  cards deal in face-down → each card auto-flips in sequence. Before every flip
+  the card levitates and pulses in its rarity colour (the anticipation beat) —
+  Commons flip fast, Eternals make you wait 3 agonising seconds with a spinning
+  gem. Flips fire escalating chimes (per-rarity arpeggios, synthesised live, no
+  audio files), value tags (+$X) pop off each card, a Pack Value counter ticks up,
+  epic+ pulls shake the whole row, and top tiers still flash the screen. Ends
+  with a verdict banner (INSANE PULL / Great pack! / …), best-pull callout,
+  value-vs-price multiplier, and an "Open another · $9.99" button that banks
+  your cards and rolls straight into the next payment sheet. Tap the cards
+  mid-sequence to fast-forward 4×.
+- **Logo**: proper mint sprig (stem + two leaves with vein details) in the
+  header, matching the favicon.
+- **Pack icons**: real booster-pack illustrations — crimped foil edges, MINT
+  sprig emblem seal, wordmark, card count. Standard = pastel foil wrapper;
+  Premium = midnight wrapper with rainbow foil bands and gold crimps. Same art
+  is what bursts open in the reveal.
