@@ -3,19 +3,25 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MINT — Own the unreal</title>
+<title>MINT — Discover adorable cards</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <header class="topbar">
   <div class="brand">
-    <span class="brand-mark"></span>
+    <span class="brand-mark"><svg viewBox="0 0 24 24"><path d="M12 21c0-6 0-9 0-9m0 0c0-4 3-6 6-6 0 4-2 6-6 6zm0 0c0-4-3-6-6-6 0 4 2 6 6 6z" fill="none" stroke="#4cbf87" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     <h1>MINT</h1>
   </div>
+  <nav class="nav">
+    <button class="nav-link active" data-tab="shop">Shop</button>
+    <button class="nav-link" data-tab="collection">Collection <span class="count" id="collCount">0</span></button>
+    <button class="nav-link" data-tab="market">Market</button>
+    <button class="nav-link" data-tab="activity">Activity</button>
+  </nav>
   <div class="wallet">
     <div class="balance-chip">
       <span class="bal-label">Balance</span>
@@ -26,30 +32,32 @@
   </div>
 </header>
 
-<nav class="seg-wrap">
-  <div class="seg" id="seg">
-    <span class="seg-pill" id="segPill"></span>
-    <button class="seg-btn active" data-tab="shop">Shop</button>
-    <button class="seg-btn" data-tab="collection">Collection</button>
-    <button class="seg-btn" data-tab="market">Market</button>
-    <button class="seg-btn" data-tab="activity">Activity</button>
-  </div>
-</nav>
-
 <main>
   <!-- SHOP -->
   <section class="panel active" id="tab-shop">
-    <div class="hero">
-      <p class="eyebrow">Limited procedural mints</p>
-      <h2>Own the unreal.</h2>
-      <p class="sub">Every specimen is minted once, serialised, and never reprinted. 500 per species. That's it.</p>
+    <div class="hero-banner">
+      <div class="hero-critters left" id="heroLeft"></div>
+      <div class="hero-copy">
+        <h2>Welcome to MINT!</h2>
+        <p>Discover adorable cards — every critter minted once, loved forever.</p>
+        <button class="btn btn-dark" data-scroll="packsRow">Shop now</button>
+      </div>
+      <div class="hero-critters right" id="heroRight"></div>
     </div>
+
+    <div class="section-head">
+      <h3>Featured collection</h3>
+      <button class="btn btn-quiet btn-sm" data-tab="market">See all</button>
+    </div>
+    <div class="grid featured" id="featuredGrid"></div>
+
+    <div class="section-head" id="packsRow"><h3>Card packs</h3></div>
     <div class="packs-row">
       <article class="pack-card">
         <div class="pack-visual pack-standard" aria-hidden="true"><div class="pack-gem"></div></div>
         <div class="pack-info">
           <h3>Standard Pack</h3>
-          <p>3 specimens · standard odds</p>
+          <p>3 critters · standard odds</p>
           <button class="btn btn-pay" data-pack="standard"><span class="pay-mark"></span>Pay&nbsp;&nbsp;$4.99</button>
         </div>
       </article>
@@ -57,22 +65,23 @@
         <div class="pack-visual pack-premium" aria-hidden="true"><div class="pack-gem"></div></div>
         <div class="pack-info">
           <h3>Premium Pack</h3>
-          <p>5 specimens · 3× Legendary odds</p>
+          <p>5 critters · 3× Legendary odds</p>
           <button class="btn btn-pay" data-pack="premium"><span class="pay-mark"></span>Pay&nbsp;&nbsp;$9.99</button>
         </div>
       </article>
     </div>
+
     <div class="odds-box">
       <h4>Mint odds</h4>
       <div class="odds" id="oddsTable"></div>
-      <p class="fine">Prices in NZD. All sales are final. Serial numbers are assigned at mint and can never be re-issued.</p>
+      <p class="fine">Prices in NZD. All sales are final. Serial numbers are assigned at mint and can never be re-issued. 500 per species — that's it.</p>
     </div>
   </section>
 
   <!-- COLLECTION -->
   <section class="panel" id="tab-collection">
     <div class="panel-head">
-      <h2>Collection <span class="count" id="collCount">0</span></h2>
+      <h2>Your collection</h2>
       <select id="sortSel" aria-label="Sort collection">
         <option value="new">Newest</option>
         <option value="rarity">Rarity</option>
@@ -81,8 +90,8 @@
     </div>
     <div class="grid" id="collectionGrid"></div>
     <div class="empty" id="collectionEmpty">
-      <p>Nothing here yet.</p>
-      <button class="btn btn-dark" data-goto="shop">Browse packs</button>
+      <p>No critters yet — your cards will live here.</p>
+      <button class="btn btn-dark" data-tab="shop">Browse packs</button>
     </div>
   </section>
 
@@ -90,6 +99,10 @@
   <section class="panel" id="tab-market">
     <div class="panel-head">
       <h2>Market</h2>
+      <div class="market-tools">
+        <input type="search" id="marketSearch" placeholder="Search critters" aria-label="Search market">
+        <select id="speciesFilter" aria-label="Filter by species"><option value="">All species</option></select>
+      </div>
       <div class="market-stats" id="marketStats"></div>
     </div>
     <div class="grid" id="marketGrid"></div>

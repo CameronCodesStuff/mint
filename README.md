@@ -64,3 +64,19 @@ block at the top of `app.js`.
 - **Cards**: rarity-tinted art tiles, 3D pointer tilt with a holographic light
   that follows the cursor, serial pill, power bar, drop-shadow art, and a
   holo sheen on Mythics.
+
+## v3 — pastel kawaii edition
+
+- **Look**: pastel storefront modeled on the mock — header nav (Shop / Collection /
+  Market / Activity), pastel gradient "Welcome to MINT!" hero with bobbing critters,
+  Featured Collection row, sprout-leaf MINT logo, Baloo 2 rounded display type.
+  Apple components stay: frosted header, pill buttons, payment/deposit/sell sheets.
+- **Cards**: trading-card layout matching the reference — pastel background tinted
+  per species, ornate double frame, MINT wordmark header, circular vignette with the
+  critter portrait, name banner + italic epithet ("The Gentle Blossom Hopper of the
+  Meadow"), serial + rarity footer. Legendary cards get a gold frame; Mythic cards
+  get an animated rainbow frame + sheen.
+- **Critters**: the SVG generator now draws original kawaii animals — bunny, cat,
+  bee, bear, dragon, owl, fox, duck, monster — with sparkle eyes, blush, per-species
+  ears/features, seeded accessories (flower/star/bow) and rarity flourishes.
+- **Market**: search box + species filter.
