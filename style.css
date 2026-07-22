@@ -468,16 +468,123 @@ input[type="search"]{width:190px}
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
+/* ============ wallet page ============ */
+.wallet-layout{display:grid;grid-template-columns:1.25fr 1fr;gap:22px;align-items:start}
+.mint-cash-card{
+  border-radius:var(--r-lg);padding:22px 24px;color:#fff;position:relative;overflow:hidden;
+  background:
+    radial-gradient(420px 200px at 85% -20%, rgba(255,255,255,.35), transparent 60%),
+    linear-gradient(120deg,#8fd7b0,#7cb8f7 30%,#b48be8 58%,#f2799f 85%,#e5b345);
+  box-shadow:0 16px 40px rgba(140,110,180,.35);
+  min-height:190px;display:flex;flex-direction:column;justify-content:space-between;
+}
+.mcc-top{display:flex;justify-content:space-between;align-items:center}
+.mcc-brand{font-family:var(--font-cute);font-weight:800;font-size:15px;letter-spacing:.22em}
+.mcc-leaf{letter-spacing:0}
+.mcc-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;opacity:.85}
+.mcc-amount{font-size:clamp(34px,7vw,44px);font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.02em;text-shadow:0 2px 12px rgba(0,0,0,.12)}
+.mcc-bottom{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.mcc-num{font-size:12px;font-weight:600;opacity:.85;font-variant-numeric:tabular-nums}
+.mcc-actions{display:flex;gap:8px}
+.btn-glass{background:rgba(255,255,255,.22);color:#fff;backdrop-filter:blur(6px)}
+.btn-glass:hover{background:rgba(255,255,255,.32)}
+.wallet-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.wstat{
+  background:var(--surface);border-radius:var(--r-md);padding:14px 16px;
+  box-shadow:var(--shadow-sm);line-height:1.25;
+}
+.wstat small{font-size:10px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);display:block;margin-bottom:4px}
+.wstat b{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.wstat span{font-size:11px;color:var(--ink-2);display:block;margin-top:2px}
+.wallet-side .side-title{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);margin-bottom:10px}
+.side-head{display:flex;align-items:center;justify-content:space-between;margin:18px 0 10px}
+.side-head .side-title{margin-bottom:0}
+.method-list{background:var(--surface);border-radius:var(--r-md);box-shadow:var(--shadow-sm);overflow:hidden}
+.method-row{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--hairline)}
+.method-row:last-child{border-bottom:none}
+.card-chip.bank{background:linear-gradient(120deg,#8fd7b0,#4cbf87)}
+.activity.compact .act-row{padding:11px 14px}
+.activity.compact .act-icon{width:32px;height:32px;font-size:13px}
+.activity.compact .act-main strong{font-size:13px}
+
+/* ============ bottom tab bar (mobile) ============ */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;
+  display:none;justify-content:space-around;align-items:stretch;
+  background:rgba(255,255,255,.82);backdrop-filter:blur(22px) saturate(1.7);
+  border-top:1px solid var(--hairline);
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom,0px));
+}
+.tab-item{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  background:none;border:none;color:var(--ink-3);padding:5px 0 3px;
+  font-size:10px;font-weight:700;border-radius:12px;min-height:48px;
+  transition:color .15s;
+}
+.tab-item svg{width:23px;height:23px}
+.tab-item.active{color:var(--ink)}
+.tab-item.active svg{color:var(--green)}
+
+/* ============ responsive ============ */
 @media (prefers-reduced-motion: reduce){
   *,*::before,*::after{animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important}
   .reveal-card{opacity:1}
 }
-@media (max-width:720px){
-  .hero-critters{display:none}
-  .nav{order:3;width:100%;justify-content:center}
+@media (hover:none){
+  .mon-card{transform:none !important}
+  .holo{display:none}
+}
+@media (max-width:900px){
+  .wallet-layout{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  /* header slims down; navigation moves to the bottom bar */
+  .topbar{padding:10px 16px calc(10px);gap:10px}
+  .nav{display:none}
+  .tabbar{display:flex}
+  .wallet .btn{display:none}            /* Add funds / Withdraw live in the Wallet tab */
+  .balance-chip{cursor:pointer}
+  main{padding:18px 14px calc(86px + env(safe-area-inset-bottom,0px))}
+
+  /* hero stacks; critters become a cute strip above the copy */
+  .hero-banner{flex-direction:column;padding:24px 18px 26px;gap:14px}
+  .hero-critters{width:auto;justify-content:center}
+  .hero-critters svg{width:52px;height:52px}
+  .hero-critters.right{display:none}
+  .hero-copy p{font-size:14px}
+
+  /* featured row becomes a swipeable snap carousel */
+  .grid.featured{
+    display:flex;overflow-x:auto;gap:14px;padding:4px 2px 14px;
+    scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;
+  }
+  .grid.featured::-webkit-scrollbar{display:none}
+  .grid.featured .mon-card{flex:0 0 176px;scroll-snap-align:start}
+
+  .panel-head h2{font-size:22px}
+  .market-tools{width:100%}
+  .market-tools input[type="search"]{flex:1;width:auto;min-width:0}
+  .packs-row{grid-template-columns:1fr}
+  .wallet-stats{grid-template-columns:repeat(3,1fr);gap:8px}
+  .wstat{padding:11px 10px}
+  .wstat b{font-size:16px}
 }
 @media (max-width:560px){
-  .topbar{padding:11px 14px}
-  main{padding:18px 14px 70px}
-  .grid{grid-template-columns:repeat(auto-fill,minmax(165px,1fr))}
+  .grid{grid-template-columns:repeat(2,1fr);gap:12px}
+  .card-name{font-size:15px}
+  .card-epithet{font-size:9.5px}
+  .mon-card .actions .btn{padding:9px 2px;font-size:11px;min-height:38px}
+  .reveal-row{gap:10px}
+  .reveal-card{width:min(150px,44vw)}
+  .detail-card{width:min(94vw,340px)}
+  .amount-chips{flex-wrap:wrap}
+  .amount-chips .chip{flex:1 0 40%}
+  .pay-sheet{max-height:88dvh;overflow-y:auto}
+  .mcc-actions .btn{padding:9px 14px}
+}
+@media (max-width:360px){
+  .grid{grid-template-columns:1fr 1fr;gap:9px}
+  .hero-critters svg{width:44px;height:44px}
+  .tab-item span{font-size:9px}
 }

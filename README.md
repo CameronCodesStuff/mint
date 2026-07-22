@@ -80,3 +80,15 @@ block at the top of `app.js`.
   bee, bear, dragon, owl, fox, duck, monster — with sparkle eyes, blush, per-species
   ears/features, seeded accessories (flower/star/bow) and rarity flourishes.
 - **Market**: search box + species filter.
+
+## v4 additions
+
+- **Wallet page**: rainbow gradient MINT Cash card with big balance + Add funds /
+  Withdraw on the card, stat tiles (portfolio at fair value, listed value, sales
+  earned vs spent all-time), payment method rows (card + payout bank), and a
+  Recent activity preview. Tapping the header balance chip opens it.
+- **Mobile**: iOS-style frosted bottom tab bar with icons (Shop / Market / Wallet /
+  Cards / Activity) + safe-area insets; header slims to logo + balance; hero stacks
+  with a critter strip; Featured becomes a swipeable snap carousel; 2-up card grid
+  with tighter type; packs stack; sheets cap at 88dvh and scroll; search stretches;
+  tilt/holo disabled on touch; ≥44px touch targets throughout.

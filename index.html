@@ -20,6 +20,7 @@
     <button class="nav-link active" data-tab="shop">Shop</button>
     <button class="nav-link" data-tab="collection">Collection <span class="count" id="collCount">0</span></button>
     <button class="nav-link" data-tab="market">Market</button>
+    <button class="nav-link" data-tab="wallet">Wallet</button>
     <button class="nav-link" data-tab="activity">Activity</button>
   </nav>
   <div class="wallet">
@@ -106,6 +107,50 @@
       <div class="market-stats" id="marketStats"></div>
     </div>
     <div class="grid" id="marketGrid"></div>
+  </section>
+
+  <!-- WALLET -->
+  <section class="panel" id="tab-wallet">
+    <div class="panel-head"><h2>Wallet</h2></div>
+    <div class="wallet-layout">
+      <div class="wallet-main">
+        <div class="mint-cash-card">
+          <div class="mcc-top">
+            <span class="mcc-brand">MINT <span class="mcc-leaf">❧</span></span>
+            <span class="mcc-label">Balance</span>
+          </div>
+          <div class="mcc-amount" id="walletBalance">$0.00</div>
+          <div class="mcc-bottom">
+            <span class="mcc-num">Cash ···· 0421</span>
+            <div class="mcc-actions">
+              <button class="btn btn-light btn-sm" id="walletDeposit">Add funds</button>
+              <button class="btn btn-glass btn-sm" id="walletWithdraw">Withdraw</button>
+            </div>
+          </div>
+        </div>
+        <div class="wallet-stats" id="walletStats"></div>
+      </div>
+      <div class="wallet-side">
+        <h4 class="side-title">Payment methods</h4>
+        <div class="method-list">
+          <div class="method-row">
+            <div class="card-chip"></div>
+            <div class="pay-method-text"><strong>MINT Card</strong><span>Visa ···· 4242 · default</span></div>
+            <span class="chev">›</span>
+          </div>
+          <div class="method-row">
+            <div class="card-chip bank"></div>
+            <div class="pay-method-text"><strong>Payout account</strong><span>Bank ···· 8231</span></div>
+            <span class="chev">›</span>
+          </div>
+        </div>
+        <div class="side-head">
+          <h4 class="side-title">Recent</h4>
+          <button class="btn btn-quiet btn-sm" data-tab="activity">See all</button>
+        </div>
+        <div class="activity compact" id="walletRecent"></div>
+      </div>
+    </div>
   </section>
 
   <!-- ACTIVITY -->
@@ -212,6 +257,29 @@
 <div class="scrim" id="detailScrim">
   <div class="detail-card" id="detailCard"></div>
 </div>
+
+<nav class="tabbar" aria-label="Primary">
+  <button class="tab-item active" data-tab="shop">
+    <svg viewBox="0 0 24 24"><path d="M6 8h12l-1 12H7L6 8zm3 0V6a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Shop</span>
+  </button>
+  <button class="tab-item" data-tab="market">
+    <svg viewBox="0 0 24 24"><path d="M4 10l8-6 8 6v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1v-9z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Market</span>
+  </button>
+  <button class="tab-item" data-tab="wallet">
+    <svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18" stroke="currentColor" stroke-width="1.8"/></svg>
+    <span>Wallet</span>
+  </button>
+  <button class="tab-item" data-tab="collection">
+    <svg viewBox="0 0 24 24"><rect x="4" y="5" width="10" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 7l4 1-3 12-4-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    <span>Cards</span>
+  </button>
+  <button class="tab-item" data-tab="activity">
+    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+    <span>Activity</span>
+  </button>
+</nav>
 
 <div class="toast" id="toast"></div>
 

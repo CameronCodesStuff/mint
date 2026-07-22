@@ -302,7 +302,9 @@ $('#payCancel').addEventListener('click', () => $('#payScrim').classList.remove(
 
 /* ---------- deposits ---------- */
 
-$('#depositBtn').addEventListener('click', () => $('#depositScrim').classList.add('open'));
+function openDeposit() { $('#depositScrim').classList.add('open'); }
+$('#depositBtn').addEventListener('click', openDeposit);
+$('#walletDeposit').addEventListener('click', openDeposit);
 
 $('#amountChips').addEventListener('click', e => {
   const chip = e.target.closest('.chip');
@@ -438,8 +440,27 @@ function renderHero() {
   $('#heroRight').innerHTML = sample(['bear', 'dragon', 'fox', 'owl']);
 }
 
+function renderWalletPage() {
+  $('#walletBalance').textContent = money(S.balance);
+  const portfolio = round2(S.collection.reduce((sum, c) => sum + fairValue(c), 0));
+  const myListings = S.market.filter(l => l.seller === 'you');
+  const listedValue = round2(myListings.reduce((sum, l) => sum + l.price, 0));
+  const spent = round2(S.activity.filter(e => e.amt < 0 && e.title !== 'Withdrawal').reduce((s, e) => s - e.amt, 0));
+  const earned = round2(S.activity.filter(e => e.amt > 0 && e.title !== 'Deposit').reduce((s, e) => s + e.amt, 0));
+  $('#walletStats').innerHTML = `
+    <div class="wstat"><small>Portfolio</small><b>${money(portfolio)}</b><span>${S.collection.length} card${S.collection.length === 1 ? '' : 's'} at fair value</span></div>
+    <div class="wstat"><small>Listed</small><b>${money(listedValue)}</b><span>${myListings.length} on the market</span></div>
+    <div class="wstat"><small>Sales earned</small><b>${money(earned)}</b><span>${money(spent)} spent all-time</span></div>`;
+  $('#walletRecent').innerHTML = S.activity.slice(0, 5).map(e => `
+    <div class="act-row">
+      <div class="act-icon">${e.icon}</div>
+      <div class="act-main"><strong>${e.title}</strong><span>${e.sub}</span></div>
+      <span class="act-amt ${e.amt > 0 ? 'pos' : ''}">${e.amt > 0 ? '+' : e.amt < 0 ? '−' : ''}${e.amt ? money(Math.abs(e.amt)) : ''}</span>
+    </div>`).join('') || '<div class="act-empty">No activity yet</div>';
+}
+
 function renderAll() {
-  renderWallet(); renderCollection(); renderMarket(); renderFeatured(); renderActivity();
+  renderWallet(); renderCollection(); renderMarket(); renderFeatured(); renderActivity(); renderWalletPage();
   persist();
 }
 
@@ -689,16 +710,18 @@ function scheduleBotBuy(listing) {
 
 /* ---------- withdraw ---------- */
 
-$('#withdrawBtn').addEventListener('click', () => {
+function openWithdraw() {
   const amt = S.balance;
-  if (amt < 0.01) return;
+  if (amt < 0.01) return toast('Nothing to withdraw yet');
   PaySheet.open([{ name: 'Transfer to bank ···· 8231', price: amt }], amt, () => {
     S.balance = 0;
     log('⤓', 'Withdrawal', 'To bank ···· 8231', -amt);
     toast(`${money(amt)} on its way to your bank`);
     renderAll();
   }, { allowBalance: false });
-});
+}
+$('#withdrawBtn').addEventListener('click', openWithdraw);
+$('#walletWithdraw').addEventListener('click', openWithdraw);
 
 /* ---------- detail modal ---------- */
 
@@ -727,10 +750,11 @@ function openDetail(id) {
 /* ---------- tabs & global events ---------- */
 
 function switchTab(name) {
-  $$('.nav-link').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  $$('.nav-link, .tab-item').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
   $$('.panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + name));
   window.scrollTo({ top: 0 });
 }
+document.querySelector('.balance-chip').addEventListener('click', () => switchTab('wallet'));
 
 document.addEventListener('click', e => {
   const closer = e.target.closest('[data-close]');
