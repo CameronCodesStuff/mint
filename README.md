@@ -193,14 +193,3 @@ unchanged. Tap the spotlight to fast-forward.
   buy (seller gets credited in a transaction); bot listings still fill the
   gaps and follow the live economy.
 
-**Firebase console setup (one-time)**
-1. Authentication → Sign-in method → enable **Email/Password** and **Google**.
-2. Firestore → create database → rules for the prototype:
-   `allow read, write: if request.auth != null;`
-3. Realtime Database → create → rules: `{ "rules": { "avatars": { ".read": true, "$uid": { ".write": "auth.uid === $uid" } } } }`
-4. Add your GitHub Pages domain under Authentication → Authorized domains.
-
-**Security reality check**: everything runs client-side, so a motivated user
-can edit their own balance. Fine for a prototype among friends; before real
-money, route balance changes through a Cloudflare Worker with the Admin SDK
-and lock Firestore rules down to read-only for money fields.
