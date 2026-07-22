@@ -92,3 +92,25 @@ block at the top of `app.js`.
   with a critter strip; Featured becomes a swipeable snap carousel; 2-up card grid
   with tighter type; packs stack; sheets cap at 88dvh and scroll; search stretches;
   tilt/holo disabled on touch; ≥44px touch targets throughout.
+
+## v5 — scarcity & living economy
+
+- **Rarity nerf**: Standard pack odds now 86 / 11.5 / 2 / 0.4 / 0.1 (Premium
+  70 / 21.5 / 6.5 / 1.6 / 0.4). Mythics are ~1-in-1000 cards from a Standard pack.
+- **Tiered supply caps** per species: Common 500 · Rare 200 · Epic 75 ·
+  Legendary 25 · Mythic 12 — ever. Sold-out tiers fall back to the next tier at
+  mint. Cards show "N left" / "SOLD OUT" badges; the detail view shows remaining.
+- **Rarity presentation**: Rare = silver-blue foil, Epic = amethyst foil +
+  sparkle field, Legendary = gold filigree corners + pulsing gold glow,
+  Mythic = animated rainbow frame + prismatic sliding overlay + glow cycle.
+  Legendary pulls flash the reveal screen gold; Mythic pulls flash prismatic.
+- **Living market**: every 8s the economy ticks — per-rarity indexes and
+  per-species demand modifiers random-walk plus drift from real events (your
+  buys push prices up, fresh mints soften them, near-sellout tiers carry a
+  scarcity premium). Bot listings reprice live with ▲/▼ deltas; your listings
+  sell probabilistically against live fair value each tick. The Market shows a
+  MINT Index with sparkline and per-rarity trend chips; the Wallet portfolio is
+  marked to live value.
+- **Art v2**: radial-gradient shading, per-species backdrop motifs (floral
+  wreath, honeycomb, crescent moon, clock ring, waves, clouds, leaf ring,
+  starfields), and little paws for the bust look.

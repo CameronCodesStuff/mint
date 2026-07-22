@@ -73,9 +73,10 @@
     </div>
 
     <div class="odds-box">
-      <h4>Mint odds</h4>
+      <h4>Mint odds & supply</h4>
       <div class="odds" id="oddsTable"></div>
-      <p class="fine">Prices in NZD. All sales are final. Serial numbers are assigned at mint and can never be re-issued. 500 per species — that's it.</p>
+      <div class="supply-note" id="supplyNote"></div>
+      <p class="fine">Prices in NZD. All sales are final. Serials are assigned at mint and never re-issued — when a tier sells out for a species, it is gone forever.</p>
     </div>
   </section>
 
@@ -103,6 +104,15 @@
       <div class="market-tools">
         <input type="search" id="marketSearch" placeholder="Search critters" aria-label="Search market">
         <select id="speciesFilter" aria-label="Filter by species"><option value="">All species</option></select>
+      </div>
+      <div class="index-bar">
+        <div class="index-main">
+          <small>MINT Index</small>
+          <b id="indexValue">100.0</b>
+          <span id="indexChange" class="chg">—</span>
+          <svg id="sparkline" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true"></svg>
+        </div>
+        <div class="trend-strip" id="trendStrip"></div>
       </div>
       <div class="market-stats" id="marketStats"></div>
     </div>

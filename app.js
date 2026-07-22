@@ -1,9 +1,16 @@
 /* ============================================================
-   MINT v3 — pastel kawaii edition. Vanilla JS, no deps.
-   New in v3: kawaii procedural critters (bunny/cat/bee/bear/
-   dragon/owl/fox/duck/monster), trading-card layout with
-   ornate frames + epithets, hero banner, featured row, and
-   market search/filters. Payments/economy unchanged from v2.
+   MINT v5 — vanilla JS, no deps.
+   New in v5:
+   • Brutal rarity: nerfed odds + per-rarity supply caps
+     (mythic = 12 per species, ever). Sold-out tiers fall back.
+   • Live economy: per-rarity indexes + per-species demand mods
+     move every 8s from random walk + real demand events (buys
+     push up, mints push down). Bot listings reprice live; your
+     listings sell probabilistically vs live fair value.
+   • Trend UI: MINT Index + sparkline + per-rarity trend chips,
+     ▲/▼ deltas on listing prices.
+   • Richer kawaii art: gradient shading, per-species backdrop
+     motifs (wreath/honeycomb/moon/waves/clock…), paws.
    ============================================================ */
 
 'use strict';
@@ -12,17 +19,20 @@
 
 const RARITIES = {
   common:    { label: 'Common',    color: 'var(--r-common)',    value: 1.2,  mult: 1.0 },
-  rare:      { label: 'Rare',      color: 'var(--r-rare)',      value: 4,    mult: 1.25 },
-  epic:      { label: 'Epic',      color: 'var(--r-epic)',      value: 12,   mult: 1.6 },
-  legendary: { label: 'Legendary', color: 'var(--r-legendary)', value: 45,   mult: 2.1 },
-  mythic:    { label: 'Mythic',    color: 'var(--r-mythic)',    value: 180,  mult: 3.0 },
+  rare:      { label: 'Rare',      color: 'var(--r-rare)',      value: 6,    mult: 1.25 },
+  epic:      { label: 'Epic',      color: 'var(--r-epic)',      value: 24,   mult: 1.6 },
+  legendary: { label: 'Legendary', color: 'var(--r-legendary)', value: 120,  mult: 2.1 },
+  mythic:    { label: 'Mythic',    color: 'var(--r-mythic)',    value: 650,  mult: 3.0 },
 };
+
+/* per-species supply caps per rarity — scarcity is the product */
+const SUPPLY = { common: 500, rare: 200, epic: 75, legendary: 25, mythic: 12 };
 
 const PACKS = {
   standard: { name: 'Standard Pack', price: 4.99, cards: 3,
-              odds: { common: 62, rare: 26, epic: 9, legendary: 2.5, mythic: 0.5 } },
+              odds: { common: 86, rare: 11.5, epic: 2, legendary: 0.4, mythic: 0.1 } },
   premium:  { name: 'Premium Pack',  price: 9.99, cards: 5,
-              odds: { common: 42, rare: 32, epic: 16, legendary: 7.5, mythic: 2.5 } },
+              odds: { common: 70, rare: 21.5, epic: 6.5, legendary: 1.6, mythic: 0.4 } },
 };
 
 const SPECIES = [
@@ -44,8 +54,8 @@ const EPITHETS = {
 };
 
 const BURST_COLORS = ['#7cb8f7', '#b48be8', '#f2799f', '#e5b345', '#8fd7b0', '#fcd9c4'];
-const MAX_SUPPLY = 500;
 const STATS = ['power', 'speed', 'defense', 'luck'];
+const TICK_MS = 8000;
 
 /* ---------- utils ---------- */
 
@@ -56,6 +66,7 @@ const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const uid  = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const money = n => '$' + n.toFixed(2);
 const round2 = n => Math.round(n * 100) / 100;
+const clamp = (n, a, b) => Math.min(b, Math.max(a, n));
 
 function seededRng(seed) {
   let t = seed >>> 0;
@@ -68,10 +79,10 @@ function seededRng(seed) {
 }
 const sPick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 
-/* ---------- storage (swap for Firestore later) ---------- */
+/* ---------- storage ---------- */
 
 const Store = {
-  KEY: 'mint_v3',
+  KEY: 'mint_v5',
   mem: null,
   load() { try { return JSON.parse(localStorage.getItem(this.KEY)) || null; } catch { return this.mem; } },
   save(s) { this.mem = s; try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch {} },
@@ -79,14 +90,89 @@ const Store = {
 
 let S = Store.load() || {
   balance: 0,
-  mints: {},
+  mints: {},           // `${species}:${rarity}` -> count
   collection: [],
-  market: [],
+  market: [],          // bot listings carry markup + lastPrice; yours carry fixed price
   activity: [],
+  economy: null,
 };
+if (!S.economy) {
+  S.economy = {
+    r: Object.fromEntries(Object.keys(RARITIES).map(k => [k, 1])),
+    sp: Object.fromEntries(SPECIES.map(s => [s.id, 1])),
+    drift: Object.fromEntries(Object.keys(RARITIES).map(k => [k, 0])),
+    spDrift: Object.fromEntries(SPECIES.map(s => [s.id, 0])),
+    hist: [100],
+  };
+}
 const persist = () => Store.save(S);
 
-/* ---------- minting ---------- */
+/* ---------- economy ---------- */
+
+function mintedCount(speciesId, rarity) { return S.mints[`${speciesId}:${rarity}`] || 0; }
+
+function scarcityFactor(c) {
+  const minted = mintedCount(c.species, c.rarity);
+  const cap = SUPPLY[c.rarity];
+  return 1 + Math.pow(minted / cap, 2) * 1.5; // near-sellout tiers command a premium
+}
+
+function fairValue(c) {
+  const e = S.economy;
+  return round2(RARITIES[c.rarity].value * e.r[c.rarity] * e.sp[c.species] * scarcityFactor(c));
+}
+
+function bumpDemand(c, amt) {
+  S.economy.drift[c.rarity] = clamp(S.economy.drift[c.rarity] + amt, -0.06, 0.09);
+  S.economy.spDrift[c.species] = clamp(S.economy.spDrift[c.species] + amt * 1.3, -0.08, 0.12);
+}
+
+function compositeIndex() {
+  const e = S.economy;
+  const vals = Object.keys(RARITIES).map(k => e.r[k]);
+  return 100 * vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+function economyTick() {
+  const e = S.economy;
+  for (const k of Object.keys(RARITIES)) {
+    e.r[k] = clamp(e.r[k] * (1 + (Math.random() - 0.5) * 0.022 + e.drift[k]), 0.55, 3.2);
+    e.drift[k] *= 0.7;
+  }
+  for (const s of SPECIES) {
+    e.sp[s.id] = clamp(e.sp[s.id] * (1 + (Math.random() - 0.5) * 0.014 + e.spDrift[s.id]), 0.7, 1.9);
+    e.spDrift[s.id] *= 0.7;
+  }
+  e.hist.push(compositeIndex());
+  if (e.hist.length > 48) e.hist.shift();
+
+  // bot listings float with the market
+  for (const l of S.market) {
+    if (l.seller === 'you') continue;
+    l.lastPrice = l.price;
+    l.price = round2(fairValue(l.creature) * l.markup);
+  }
+
+  // your listings: probabilistic sales vs live fair value
+  for (const l of [...S.market]) {
+    if (l.seller !== 'you') continue;
+    const ratio = l.price / fairValue(l.creature);
+    const p = ratio <= 1 ? 0.5 : ratio <= 1.15 ? 0.3 : ratio <= 1.4 ? 0.12 : ratio <= 1.6 ? 0.05 : 0;
+    if (Math.random() < p) {
+      S.market.splice(S.market.indexOf(l), 1);
+      S.balance = round2(S.balance + l.price);
+      bumpDemand(l.creature, 0.02);
+      log('✓', `Sold ${l.creature.name}`, `To @${pick(['aria.k','vault_9','no1collector','kiwi.mints'])}`, l.price);
+      toast(`${l.creature.name} sold for ${money(l.price)}`);
+    }
+  }
+
+  renderMarket(); renderFeatured(); renderIndex(); renderWalletPage(); renderWallet();
+  persist();
+}
+setInterval(economyTick, TICK_MS);
+
+/* ---------- minting (supply-capped) ---------- */
 
 function rollRarity(odds) {
   let roll = Math.random() * 100;
@@ -97,78 +183,157 @@ function rollRarity(odds) {
   return 'common';
 }
 
+const RARITY_ORDER = ['mythic', 'legendary', 'epic', 'rare', 'common'];
+
 function mintCreature(rarity) {
-  const sp = pick(SPECIES);
-  S.mints[sp.id] = (S.mints[sp.id] || 0) + 1;
+  // find a species with supply left at this tier; otherwise fall back down the tiers
+  let tierIdx = RARITY_ORDER.indexOf(rarity);
+  let sp = null;
+  while (tierIdx < RARITY_ORDER.length) {
+    const tier = RARITY_ORDER[tierIdx];
+    const open = SPECIES.filter(s => mintedCount(s.id, tier) < SUPPLY[tier]);
+    if (open.length) { rarity = tier; sp = pick(open); break; }
+    tierIdx++;
+  }
+  if (!sp) { rarity = 'common'; sp = pick(SPECIES); } // unreachable in practice
+
+  const key = `${sp.id}:${rarity}`;
+  S.mints[key] = (S.mints[key] || 0) + 1;
   const mult = RARITIES[rarity].mult;
   const stats = {};
   for (const st of STATS) stats[st] = Math.min(100, Math.round(rand(20, 60) * mult));
   const seed = rand(1, 2 ** 31);
   const rng = seededRng(seed ^ 0x9e37);
+  bumpDemand({ rarity, species: sp.id }, -0.004); // new supply softens price a touch
   return {
     id: uid(),
     species: sp.id,
     name: sPick(rng, sp.names),
     epithet: `The ${sPick(rng, EPITHETS.adj)} ${sPick(rng, EPITHETS.role)} of ${sPick(rng, EPITHETS.place)}`,
     rarity,
-    serial: Math.min(S.mints[sp.id], MAX_SUPPLY),
+    serial: S.mints[key],
     seed,
     stats,
     mintedAt: Date.now(),
   };
 }
 
-/* ---------- kawaii procedural SVG art ---------- */
+/* ---------- kawaii procedural SVG art (v2 of the generator) ---------- */
 
-function svgFor(c, size = '') {
+function motifFor(spId, rng, line, hue) {
+  const soft = `hsl(${hue} 60% 78%)`;
+  switch (spId) {
+    case 'bunny': { // floral wreath
+      let f = '';
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2 + 0.4;
+        const x = 60 + Math.cos(a) * 45, y = 64 + Math.sin(a) * 45;
+        const col = i % 2 ? '#f7a8bc' : '#fbe9b7';
+        f += `<g transform="translate(${x.toFixed(1)},${y.toFixed(1)})" opacity=".85">
+          <circle r="3.4" fill="${col}"/><circle r="1.4" fill="#fff"/>
+          <circle cx="4.5" r="2" fill="#c9ecd9"/></g>`;
+      }
+      return f;
+    }
+    case 'bee': { // honeycomb corners
+      const hex = (x, y, s, o) => `<path d="M${x},${y - s} l${s * .87},${s * .5} v${s} l-${s * .87},${s * .5} l-${s * .87},-${s * .5} v-${s} Z" fill="none" stroke="#e5b345" stroke-width="1.6" opacity="${o}"/>`;
+      return hex(24, 26, 9, .8) + hex(40, 20, 7, .55) + hex(96, 96, 9, .8) + hex(82, 102, 7, .55);
+    }
+    case 'bear': // crescent moon + stars
+      return `<path d="M88 22 a13 13 0 1 0 8 22 a10.5 10.5 0 1 1 -8 -22 Z" fill="#fbe9b7" stroke="#e5b345" stroke-width="1.4" opacity=".9"/>
+              <text x="22" y="32" font-size="10" fill="#e5b345" opacity=".85">✦</text>
+              <text x="30" y="98" font-size="8" fill="#e5b345" opacity=".7">✦</text>`;
+    case 'duck': // waves
+      return `<path d="M8 100 q10 -8 20 0 t20 0 t20 0 t20 0 t20 0" fill="none" stroke="#7cc6e8" stroke-width="2.4" opacity=".7" stroke-linecap="round"/>
+              <path d="M14 110 q10 -7 20 0 t20 0 t20 0 t20 0" fill="none" stroke="#a5dcf0" stroke-width="2" opacity=".6" stroke-linecap="round"/>`;
+    case 'owl': { // clock ring
+      let ticks = '';
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const x1 = 60 + Math.cos(a) * 46, y1 = 64 + Math.sin(a) * 46;
+        const x2 = 60 + Math.cos(a) * 50, y2 = 64 + Math.sin(a) * 50;
+        ticks += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="#c8a86a" stroke-width="${i % 3 ? 1.2 : 2.2}" opacity=".8"/>`;
+      }
+      return `<circle cx="60" cy="64" r="48" fill="none" stroke="#c8a86a" stroke-width="1.2" opacity=".55"/>` + ticks;
+    }
+    case 'dragon': // starfield swirl
+      return `<text x="18" y="30" font-size="11" fill="#b48be8" opacity=".9">✦</text>
+              <text x="94" y="24" font-size="8" fill="#7cb8f7" opacity=".8">✦</text>
+              <text x="100" y="90" font-size="10" fill="#f2799f" opacity=".8">✦</text>
+              <path d="M20 96 q8 -10 20 -6" fill="none" stroke="#b48be8" stroke-width="1.6" opacity=".5" stroke-linecap="round"/>`;
+    case 'fox': // clouds
+      return `<g fill="#fff" opacity=".85"><ellipse cx="26" cy="30" rx="11" ry="6"/><ellipse cx="35" cy="27" rx="8" ry="5"/></g>
+              <g fill="#fff" opacity=".7"><ellipse cx="94" cy="98" rx="10" ry="5.5"/><ellipse cx="86" cy="95" rx="7" ry="4.5"/></g>`;
+    case 'monster': { // leaf ring
+      let l = '';
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * Math.PI * 2 + 0.5;
+        const x = 60 + Math.cos(a) * 46, y = 64 + Math.sin(a) * 46;
+        l += `<ellipse cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" rx="4.5" ry="2.2" fill="#8fd7b0" opacity=".8" transform="rotate(${(a * 57 + 90).toFixed(0)} ${x.toFixed(1)} ${y.toFixed(1)})"/>`;
+      }
+      return l;
+    }
+    default: // cat — sparkles + tiny moon
+      return `<text x="20" y="34" font-size="10" fill="${soft}" opacity=".9">✦</text>
+              <text x="96" y="30" font-size="8" fill="${soft}" opacity=".8">✧</text>
+              <text x="98" y="100" font-size="9" fill="${soft}" opacity=".8">✦</text>`;
+  }
+}
+
+function svgFor(c) {
   const sp = SPECIES.find(s => s.id === c.species);
   const rng = seededRng(c.seed);
   const hue = (sp.hue + Math.floor(rng() * 18) - 9 + 360) % 360;
-  const fill = `hsl(${hue} 68% 84%)`;
-  const line = `hsl(${hue} 42% 60%)`;
-  const dark = `hsl(${hue} 45% 48%)`;
-  const inner = `hsl(${hue} 80% 92%)`;
-  const cx = 60, cy = 66, r = 30;
-  const st = `stroke="${line}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"`;
+  const gid = 'g' + (c.seed % 100000);
+  const fillTop = `hsl(${hue} 74% 88%)`;
+  const fillBot = `hsl(${hue} 62% 78%)`;
+  const line = `hsl(${hue} 42% 58%)`;
+  const dark = `hsl(${hue} 45% 46%)`;
+  const inner = `hsl(${hue} 82% 93%)`;
+  const cx = 60, cy = 64, r = 29;
+  const st = `stroke="${line}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"`;
+  const headFill = `url(#${gid})`;
 
   let ears = '', face = '', extras = '';
 
   switch (sp.id) {
     case 'bunny':
-      ears = `<ellipse cx="${cx - 13}" cy="${cy - r - 12}" rx="8" ry="20" fill="${fill}" ${st} transform="rotate(-10 ${cx - 13} ${cy - r - 12})"/>
-              <ellipse cx="${cx + 13}" cy="${cy - r - 12}" rx="8" ry="20" fill="${fill}" ${st} transform="rotate(10 ${cx + 13} ${cy - r - 12})"/>
+      ears = `<ellipse cx="${cx - 13}" cy="${cy - r - 12}" rx="8" ry="20" fill="${headFill}" ${st} transform="rotate(-10 ${cx - 13} ${cy - r - 12})"/>
+              <ellipse cx="${cx + 13}" cy="${cy - r - 12}" rx="8" ry="20" fill="${headFill}" ${st} transform="rotate(10 ${cx + 13} ${cy - r - 12})"/>
               <ellipse cx="${cx - 13}" cy="${cy - r - 10}" rx="4" ry="13" fill="${inner}" transform="rotate(-10 ${cx - 13} ${cy - r - 10})"/>
               <ellipse cx="${cx + 13}" cy="${cy - r - 10}" rx="4" ry="13" fill="${inner}" transform="rotate(10 ${cx + 13} ${cy - r - 10})"/>`;
       break;
     case 'cat':
-      ears = `<path d="M${cx - 26},${cy - r + 8} L${cx - 22},${cy - r - 16} L${cx - 8},${cy - r + 2} Z" fill="${fill}" ${st}/>
-              <path d="M${cx + 26},${cy - r + 8} L${cx + 22},${cy - r - 16} L${cx + 8},${cy - r + 2} Z" fill="${fill}" ${st}/>
+      ears = `<path d="M${cx - 26},${cy - r + 8} L${cx - 22},${cy - r - 16} L${cx - 8},${cy - r + 2} Z" fill="${headFill}" ${st}/>
+              <path d="M${cx + 26},${cy - r + 8} L${cx + 22},${cy - r - 16} L${cx + 8},${cy - r + 2} Z" fill="${headFill}" ${st}/>
               <path d="M${cx - 22},${cy - r + 5} L${cx - 20},${cy - r - 8} L${cx - 12},${cy - r + 2} Z" fill="${inner}"/>
               <path d="M${cx + 22},${cy - r + 5} L${cx + 20},${cy - r - 8} L${cx + 12},${cy - r + 2} Z" fill="${inner}"/>`;
-      face = `<line x1="${cx - 34}" y1="${cy + 4}" x2="${cx - 44}" y2="${cy + 2}" ${st}/>
-              <line x1="${cx - 34}" y1="${cy + 10}" x2="${cx - 44}" y2="${cy + 12}" ${st}/>
-              <line x1="${cx + 34}" y1="${cy + 4}" x2="${cx + 44}" y2="${cy + 2}" ${st}/>
-              <line x1="${cx + 34}" y1="${cy + 10}" x2="${cx + 44}" y2="${cy + 12}" ${st}/>`;
+      face = `<line x1="${cx - 33}" y1="${cy + 4}" x2="${cx - 43}" y2="${cy + 2}" ${st}/>
+              <line x1="${cx - 33}" y1="${cy + 10}" x2="${cx - 43}" y2="${cy + 12}" ${st}/>
+              <line x1="${cx + 33}" y1="${cy + 4}" x2="${cx + 43}" y2="${cy + 2}" ${st}/>
+              <line x1="${cx + 33}" y1="${cy + 10}" x2="${cx + 43}" y2="${cy + 12}" ${st}/>`;
       break;
     case 'bear':
-      ears = `<circle cx="${cx - 20}" cy="${cy - r + 2}" r="10" fill="${fill}" ${st}/>
-              <circle cx="${cx + 20}" cy="${cy - r + 2}" r="10" fill="${fill}" ${st}/>
+      ears = `<circle cx="${cx - 20}" cy="${cy - r + 2}" r="10" fill="${headFill}" ${st}/>
+              <circle cx="${cx + 20}" cy="${cy - r + 2}" r="10" fill="${headFill}" ${st}/>
               <circle cx="${cx - 20}" cy="${cy - r + 2}" r="5" fill="${inner}"/>
               <circle cx="${cx + 20}" cy="${cy - r + 2}" r="5" fill="${inner}"/>`;
       face = `<ellipse cx="${cx}" cy="${cy + 12}" rx="10" ry="7" fill="${inner}"/>
               <ellipse cx="${cx}" cy="${cy + 9}" rx="3.4" ry="2.6" fill="${dark}"/>`;
       break;
     case 'fox':
-      ears = `<path d="M${cx - 28},${cy - r + 10} L${cx - 24},${cy - r - 18} L${cx - 6},${cy - r + 2} Z" fill="${fill}" ${st}/>
-              <path d="M${cx + 28},${cy - r + 10} L${cx + 24},${cy - r - 18} L${cx + 6},${cy - r + 2} Z" fill="${fill}" ${st}/>`;
+      ears = `<path d="M${cx - 28},${cy - r + 10} L${cx - 24},${cy - r - 18} L${cx - 6},${cy - r + 2} Z" fill="${headFill}" ${st}/>
+              <path d="M${cx + 28},${cy - r + 10} L${cx + 24},${cy - r - 18} L${cx + 6},${cy - r + 2} Z" fill="${headFill}" ${st}/>
+              <path d="M${cx - 25},${cy - r + 8} L${cx - 22.5},${cy - r - 11} L${cx - 12},${cy - r + 3} Z" fill="${inner}"/>
+              <path d="M${cx + 25},${cy - r + 8} L${cx + 22.5},${cy - r - 11} L${cx + 12},${cy - r + 3} Z" fill="${inner}"/>`;
       face = `<path d="M${cx - 22},${cy + 8} Q${cx},${cy + 30} ${cx + 22},${cy + 8} Q${cx},${cy + 20} ${cx - 22},${cy + 8} Z" fill="#fff8f0" opacity=".9"/>
               <ellipse cx="${cx}" cy="${cy + 12}" rx="3.2" ry="2.6" fill="${dark}"/>`;
       break;
     case 'owl':
-      ears = `<path d="M${cx - 24},${cy - r + 6} L${cx - 18},${cy - r - 12} L${cx - 8},${cy - r + 1} Z" fill="${fill}" ${st}/>
-              <path d="M${cx + 24},${cy - r + 6} L${cx + 18},${cy - r - 12} L${cx + 8},${cy - r + 1} Z" fill="${fill}" ${st}/>`;
-      face = `<circle cx="${cx - 11}" cy="${cy - 2}" r="11" fill="#fff" opacity=".92"/>
-              <circle cx="${cx + 11}" cy="${cy - 2}" r="11" fill="#fff" opacity=".92"/>
+      ears = `<path d="M${cx - 24},${cy - r + 6} L${cx - 18},${cy - r - 12} L${cx - 8},${cy - r + 1} Z" fill="${headFill}" ${st}/>
+              <path d="M${cx + 24},${cy - r + 6} L${cx + 18},${cy - r - 12} L${cx + 8},${cy - r + 1} Z" fill="${headFill}" ${st}/>`;
+      face = `<circle cx="${cx - 11}" cy="${cy - 2}" r="11" fill="#fff" opacity=".93"/>
+              <circle cx="${cx + 11}" cy="${cy - 2}" r="11" fill="#fff" opacity=".93"/>
               <path d="M${cx - 4},${cy + 8} L${cx + 4},${cy + 8} L${cx},${cy + 15} Z" fill="${dark}"/>`;
       break;
     case 'bee':
@@ -176,9 +341,9 @@ function svgFor(c, size = '') {
               <line x1="${cx + 9}" y1="${cy - r}" x2="${cx + 15}" y2="${cy - r - 15}" ${st}/>
               <circle cx="${cx - 15}" cy="${cy - r - 17}" r="4" fill="${dark}"/>
               <circle cx="${cx + 15}" cy="${cy - r - 17}" r="4" fill="${dark}"/>`;
-      extras = `<ellipse cx="${cx - 36}" cy="${cy - 6}" rx="10" ry="15" fill="#fff" opacity=".7" transform="rotate(-24 ${cx - 36} ${cy - 6})"/>
-                <ellipse cx="${cx + 36}" cy="${cy - 6}" rx="10" ry="15" fill="#fff" opacity=".7" transform="rotate(24 ${cx + 36} ${cy - 6})"/>
-                <path d="M${cx - 28},${cy + 14} Q${cx},${cy + 26} ${cx + 28},${cy + 14}" fill="none" stroke="${dark}" stroke-width="5" stroke-linecap="round" opacity=".55"/>`;
+      extras = `<ellipse cx="${cx - 35}" cy="${cy - 6}" rx="10" ry="15" fill="#fff" opacity=".75" transform="rotate(-24 ${cx - 35} ${cy - 6})"/>
+                <ellipse cx="${cx + 35}" cy="${cy - 6}" rx="10" ry="15" fill="#fff" opacity=".75" transform="rotate(24 ${cx + 35} ${cy - 6})"/>
+                <path d="M${cx - 27},${cy + 15} Q${cx},${cy + 27} ${cx + 27},${cy + 15}" fill="none" stroke="${dark}" stroke-width="5" stroke-linecap="round" opacity=".5"/>`;
       break;
     case 'dragon':
       ears = `<path d="M${cx - 16},${cy - r + 2} L${cx - 20},${cy - r - 14} L${cx - 6},${cy - r - 2} Z" fill="${inner}" ${st}/>
@@ -192,16 +357,20 @@ function svgFor(c, size = '') {
       face = `<ellipse cx="${cx}" cy="${cy + 10}" rx="11" ry="6.5" fill="#f5b355" stroke="#d9953a" stroke-width="2"/>`;
       break;
     case 'monster':
-      ears = `<circle cx="${cx - 16}" cy="${cy - r + 1}" r="7" fill="${fill}" ${st}/>
-              <circle cx="${cx}" cy="${cy - r - 4}" r="7" fill="${fill}" ${st}/>
-              <circle cx="${cx + 16}" cy="${cy - r + 1}" r="7" fill="${fill}" ${st}/>`;
+      ears = `<circle cx="${cx - 16}" cy="${cy - r + 1}" r="7" fill="${headFill}" ${st}/>
+              <circle cx="${cx}" cy="${cy - r - 4}" r="7" fill="${headFill}" ${st}/>
+              <circle cx="${cx + 16}" cy="${cy - r + 1}" r="7" fill="${headFill}" ${st}/>`;
       face = `<path d="M${cx - 3},${cy + 13} L${cx + 3},${cy + 13} L${cx},${cy + 18} Z" fill="#fff" stroke="${line}" stroke-width="1.5"/>`;
       break;
   }
 
-  // eyes + blush + smile (duck/bear/fox/owl draw their own nose/beak)
+  // tiny paws peeking under the chin (bust look, like the reference cards)
+  const paws = ['bee', 'duck', 'dragon'].includes(sp.id) ? '' :
+    `<circle cx="${cx - 12}" cy="${cy + r - 2}" r="5.5" fill="${headFill}" ${st}/>
+     <circle cx="${cx + 12}" cy="${cy + r - 2}" r="5.5" fill="${headFill}" ${st}/>`;
+
   const eyeY = cy - 2;
-  const sparkleEyes = `
+  const eyes = `
     <circle cx="${cx - 11}" cy="${eyeY}" r="4.6" fill="#3d3a43"/>
     <circle cx="${cx + 11}" cy="${eyeY}" r="4.6" fill="#3d3a43"/>
     <circle cx="${cx - 9.6}" cy="${eyeY - 1.6}" r="1.7" fill="#fff"/>
@@ -211,52 +380,47 @@ function svgFor(c, size = '') {
   const blush = `
     <ellipse cx="${cx - 20}" cy="${cy + 7}" rx="5.5" ry="3.4" fill="#f7a8bc" opacity=".55"/>
     <ellipse cx="${cx + 20}" cy="${cy + 7}" rx="5.5" ry="3.4" fill="#f7a8bc" opacity=".55"/>`;
-  const smile = ['duck', 'owl', 'monster'].includes(sp.id) ? '' :
+  const smile = ['duck', 'owl', 'monster', 'bear', 'fox'].includes(sp.id) ? '' :
     `<path d="M${cx - 5},${cy + 9} Q${cx},${cy + 13} ${cx + 5},${cy + 9}" fill="none" stroke="${dark}" stroke-width="2" stroke-linecap="round"/>`;
 
-  // seeded accessory
   const acc = Math.floor(rng() * 4);
   let accessory = '';
   if (acc === 1) accessory = `<circle cx="${cx + 24}" cy="${cy - r + 6}" r="4.5" fill="#f7a8bc"/><circle cx="${cx + 24}" cy="${cy - r + 6}" r="1.8" fill="#fbe9b7"/>`;
   if (acc === 2) accessory = `<path d="M${cx - 27},${cy - r + 4} l2.2,4.6 5,.6 -3.7,3.4 1,4.9 -4.5,-2.5 -4.5,2.5 1,-4.9 -3.7,-3.4 5,-.6 Z" fill="#fbe9b7" stroke="#e5b345" stroke-width="1"/>`;
   if (acc === 3) accessory = `<path d="M${cx - 6},${cy - r - 3} q-6,-6 -10,0 q4,6 10,0 Z M${cx - 6},${cy - r - 3} q6,-6 10,0 q-4,6 -10,0 Z" fill="#f7a8bc" stroke="#e786a3" stroke-width="1.2"/><circle cx="${cx - 6}" cy="${cy - r - 3}" r="2" fill="#fff"/>`;
 
-  // rarity flourishes
   let flair = '';
-  if (['epic', 'legendary', 'mythic'].includes(c.rarity)) {
-    flair += `<text x="18" y="30" font-size="11" opacity=".8">✦</text><text x="92" y="26" font-size="9" opacity=".7">✦</text><text x="98" y="96" font-size="10" opacity=".7">✦</text>`;
-  }
   if (['legendary', 'mythic'].includes(c.rarity)) {
     const ring = c.rarity === 'mythic' ? 'url(#rainbow)' : '#e5b345';
-    flair += `<circle cx="${cx}" cy="${cy}" r="46" fill="none" stroke="${ring}" stroke-width="1.6" stroke-dasharray="5 6" opacity=".8">
+    flair = `<circle cx="${cx}" cy="${cy}" r="52" fill="none" stroke="${ring}" stroke-width="1.8" stroke-dasharray="5 6" opacity=".85">
       <animateTransform attributeName="transform" type="rotate" from="0 ${cx} ${cy}" to="360 ${cx} ${cy}" dur="12s" repeatCount="indefinite"/>
     </circle>`;
   }
 
-  return `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="art ${size}" role="img" aria-label="${c.name} the ${sp.label}">
-    <defs><linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#7cb8f7"/><stop offset=".33" stop-color="#b48be8"/><stop offset=".66" stop-color="#f2799f"/><stop offset="1" stop-color="#e5b345"/>
-    </linearGradient></defs>
-    ${flair}${ears}
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" ${st}/>
-    ${extras}${face}${sparkleEyes}${blush}${smile}${accessory}
+  return `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg" class="art" role="img" aria-label="${c.name} the ${sp.label}">
+    <defs>
+      <radialGradient id="${gid}" cx=".5" cy=".38" r=".75">
+        <stop offset="0" stop-color="${fillTop}"/><stop offset="1" stop-color="${fillBot}"/>
+      </radialGradient>
+      <linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#7cb8f7"/><stop offset=".33" stop-color="#b48be8"/><stop offset=".66" stop-color="#f2799f"/><stop offset="1" stop-color="#e5b345"/>
+      </linearGradient>
+    </defs>
+    ${motifFor(sp.id, rng, line, hue)}${flair}${ears}
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="${headFill}" ${st}/>
+    ${paws}${extras}${face}${eyes}${blush}${smile}${accessory}
   </svg>`;
 }
 
-/* card frame colors derived from species hue */
 function cardVars(c) {
   const sp = SPECIES.find(s => s.id === c.species);
   return `--rc:${RARITIES[c.rarity].color};--pastel:hsl(${sp.hue} 72% 93%);--frame:hsl(${sp.hue} 46% 72%)`;
 }
 
 /* ---------- payment sheet (balance-aware) ---------- */
-/* Real integration: swap charge() for a POST to your Cloudflare
-   Worker -> Stripe PaymentIntent; fulfil on the webhook only. */
 
 const PaySheet = {
-  onSuccess: null,
-  usingBalance: false,
-  total: 0,
+  onSuccess: null, usingBalance: false, total: 0,
   open(lines, total, onSuccess, { allowBalance = true } = {}) {
     this.onSuccess = onSuccess;
     this.total = total;
@@ -300,7 +464,7 @@ const PaySheet = {
 $('#payConfirm').addEventListener('click', () => PaySheet.charge());
 $('#payCancel').addEventListener('click', () => $('#payScrim').classList.remove('open'));
 
-/* ---------- deposits ---------- */
+/* ---------- deposits & withdraw ---------- */
 
 function openDeposit() { $('#depositScrim').classList.add('open'); }
 $('#depositBtn').addEventListener('click', openDeposit);
@@ -327,6 +491,19 @@ $('#depositContinue').addEventListener('click', () => {
   }, { allowBalance: false });
 });
 
+function openWithdraw() {
+  const amt = S.balance;
+  if (amt < 0.01) return toast('Nothing to withdraw yet');
+  PaySheet.open([{ name: 'Transfer to bank ···· 8231', price: amt }], amt, () => {
+    S.balance = 0;
+    log('⤓', 'Withdrawal', 'To bank ···· 8231', -amt);
+    toast(`${money(amt)} on its way to your bank`);
+    renderAll();
+  }, { allowBalance: false });
+}
+$('#withdrawBtn').addEventListener('click', openWithdraw);
+$('#walletWithdraw').addEventListener('click', openWithdraw);
+
 /* ---------- activity ---------- */
 
 function log(icon, title, sub, amt) {
@@ -350,22 +527,30 @@ function renderWallet() {
   $('#collCount').textContent = S.collection.length;
 }
 
+function supplyBadge(c) {
+  const minted = mintedCount(c.species, c.rarity);
+  const cap = SUPPLY[c.rarity];
+  const left = cap - minted;
+  if (left <= 0) return `<span class="sold-out">Sold out</span>`;
+  if (left <= cap * 0.2) return `<span class="low-supply">${left} left</span>`;
+  return '';
+}
+
 function monCardHTML(c, actions) {
   const r = RARITIES[c.rarity];
-  const cls = [
-    'mon-card',
-    c.rarity === 'legendary' ? 'frame-legendary' : '',
-    c.rarity === 'mythic' ? 'frame-mythic mythic-sheen' : '',
-  ].join(' ');
+  const cls = ['mon-card', `frame-${c.rarity}`, c.rarity === 'mythic' ? 'mythic-sheen' : ''].join(' ');
+  const orn = ['legendary', 'mythic'].includes(c.rarity)
+    ? '<i class="orn tl"></i><i class="orn tr"></i><i class="orn bl"></i><i class="orn br"></i>' : '';
   return `<article class="${cls}" style="${cardVars(c)}" data-tilt data-id="${c.id}">
     <div class="card-face">
+      ${orn}
       <div class="card-mint">MINT</div>
       <div class="card-vignette">${svgFor(c)}</div>
       <div class="card-name">${c.name}</div>
       <div class="card-epithet">${c.epithet}</div>
       <div class="card-foot">
-        <span>No. ${String(c.serial).padStart(3, '0')} / ${MAX_SUPPLY}</span>
-        <span class="rpill" style="--rc:${r.color}">${r.label}</span>
+        <span>No. ${String(c.serial).padStart(3, '0')} / ${SUPPLY[c.rarity]} ${supplyBadge(c)}</span>
+        <span class="rpill" style="--rc:${r.color}">◆ ${r.label}</span>
       </div>
       <div class="holo"></div>
     </div>
@@ -386,6 +571,12 @@ function renderCollection() {
   `)).join('');
 }
 
+function priceDelta(l) {
+  if (l.seller === 'you' || !l.lastPrice || l.lastPrice === l.price) return '';
+  const up = l.price > l.lastPrice;
+  return `<i class="pd ${up ? 'up' : 'down'}">${up ? '▲' : '▼'}</i>`;
+}
+
 function marketFilters(l) {
   const q = ($('#marketSearch').value || '').trim().toLowerCase();
   const spF = $('#speciesFilter').value;
@@ -402,7 +593,7 @@ function renderMarket() {
   const visible = S.market.filter(marketFilters);
   $('#marketGrid').innerHTML = visible.map(l => monCardHTML(l.creature, l.seller === 'you'
     ? `<button class="btn btn-quiet" data-act="delist" data-lid="${l.id}">Delist · ${money(l.price)}</button>`
-    : `<button class="btn btn-dark" data-act="buy" data-lid="${l.id}"><span class="pay-mark"></span>&nbsp;${money(l.price)}</button>`
+    : `<button class="btn btn-dark" data-act="buy" data-lid="${l.id}">${priceDelta(l)}&nbsp;${money(l.price)}</button>`
   )).join('');
   const others = S.market.filter(l => l.seller !== 'you');
   const floor = others.length ? Math.min(...others.map(l => l.price)) : 0;
@@ -417,6 +608,29 @@ function renderFeatured() {
   `)).join('');
 }
 
+function renderIndex() {
+  const e = S.economy;
+  const now = compositeIndex();
+  const back = e.hist[Math.max(0, e.hist.length - 11)];
+  const chg = ((now - back) / back) * 100;
+  $('#indexValue').textContent = now.toFixed(1);
+  const chgEl = $('#indexChange');
+  chgEl.textContent = `${chg >= 0 ? '▲' : '▼'} ${Math.abs(chg).toFixed(1)}%`;
+  chgEl.className = 'chg ' + (chg >= 0 ? 'up' : 'down');
+  // sparkline
+  const h = e.hist;
+  const min = Math.min(...h), max = Math.max(...h), span = (max - min) || 1;
+  const pts = h.map((v, i) => `${(i / (h.length - 1 || 1)) * 120},${28 - ((v - min) / span) * 24 - 2}`).join(' ');
+  $('#sparkline').innerHTML = `<polyline points="${pts}" fill="none" stroke="${chg >= 0 ? '#4cbf87' : '#ef6a6a'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  // rarity trend chips
+  $('#trendStrip').innerHTML = Object.keys(RARITIES).map(k => {
+    const idx = e.r[k];
+    const dir = idx >= 1 ? 'up' : 'down';
+    return `<span class="trend-chip"><i style="background:${RARITIES[k].color}"></i>${RARITIES[k].label}
+      <b class="${dir}">${(idx * 100).toFixed(0)}</b></span>`;
+  }).join('');
+}
+
 function renderActivity() {
   $('#activityList').innerHTML = S.activity.map(e => `
     <div class="act-row">
@@ -429,6 +643,8 @@ function renderActivity() {
 function renderOdds() {
   $('#oddsTable').innerHTML = Object.keys(RARITIES).map(k =>
     `<span><i style="background:${RARITIES[k].color}"></i>${RARITIES[k].label} <small>${PACKS.standard.odds[k]}% / ${PACKS.premium.odds[k]}%</small></span>`).join('');
+  $('#supplyNote').innerHTML = Object.keys(SUPPLY).map(k =>
+    `<span style="color:${RARITIES[k].color}">${RARITIES[k].label}: <b>${SUPPLY[k]}</b>/species</span>`).join(' · ');
 }
 
 function renderHero() {
@@ -448,7 +664,7 @@ function renderWalletPage() {
   const spent = round2(S.activity.filter(e => e.amt < 0 && e.title !== 'Withdrawal').reduce((s, e) => s - e.amt, 0));
   const earned = round2(S.activity.filter(e => e.amt > 0 && e.title !== 'Deposit').reduce((s, e) => s + e.amt, 0));
   $('#walletStats').innerHTML = `
-    <div class="wstat"><small>Portfolio</small><b>${money(portfolio)}</b><span>${S.collection.length} card${S.collection.length === 1 ? '' : 's'} at fair value</span></div>
+    <div class="wstat"><small>Portfolio</small><b>${money(portfolio)}</b><span>${S.collection.length} card${S.collection.length === 1 ? '' : 's'} at live value</span></div>
     <div class="wstat"><small>Listed</small><b>${money(listedValue)}</b><span>${myListings.length} on the market</span></div>
     <div class="wstat"><small>Sales earned</small><b>${money(earned)}</b><span>${money(spent)} spent all-time</span></div>`;
   $('#walletRecent').innerHTML = S.activity.slice(0, 5).map(e => `
@@ -460,7 +676,7 @@ function renderWalletPage() {
 }
 
 function renderAll() {
-  renderWallet(); renderCollection(); renderMarket(); renderFeatured(); renderActivity(); renderWalletPage();
+  renderWallet(); renderCollection(); renderMarket(); renderFeatured(); renderActivity(); renderWalletPage(); renderIndex();
   persist();
 }
 
@@ -541,12 +757,12 @@ function showReveal() {
     return `<div class="reveal-card${epicplus}" data-i="${i}" style="${cardVars(c)};--d:${(i * 0.09).toFixed(2)}s">
       <div class="reveal-inner">
         <div class="reveal-face reveal-back"><div class="gem"></div></div>
-        <div class="reveal-face reveal-front">
+        <div class="reveal-face reveal-front frame-${c.rarity}">
           <div class="card-mint">MINT</div>
           <div class="card-vignette">${svgFor(c)}</div>
           <div class="card-name">${c.name}</div>
           <div class="card-epithet">${c.epithet}</div>
-          <span class="rname">${r.label} · No. ${c.serial}</span>
+          <span class="rname">◆ ${r.label} · No. ${c.serial} / ${SUPPLY[c.rarity]}</span>
         </div>
       </div>
     </div>`;
@@ -559,7 +775,11 @@ function flipCard(card) {
   card.classList.add('flipped');
   const c = pendingPack[+card.dataset.i];
   card.insertAdjacentHTML('beforeend', '<span class="flash"></span>');
-  if (['legendary', 'mythic'].includes(c.rarity)) card.insertAdjacentHTML('beforeend', confettiHTML());
+  if (['legendary', 'mythic'].includes(c.rarity)) {
+    card.insertAdjacentHTML('beforeend', confettiHTML());
+    $('#revealScrim').classList.add(c.rarity === 'mythic' ? 'prism' : 'goldglow');
+    setTimeout(() => $('#revealScrim').classList.remove('prism', 'goldglow'), 1400);
+  }
 }
 
 $('#revealAll').addEventListener('click', () => {
@@ -578,22 +798,21 @@ $('#revealDone').addEventListener('click', () => {
 
 /* ---------- market ---------- */
 
-function fairValue(c) { return RARITIES[c.rarity].value; }
-
 function rarityFloor(rarity) {
   const prices = S.market.filter(l => l.seller !== 'you' && l.creature.rarity === rarity).map(l => l.price);
-  return prices.length ? Math.min(...prices) : round2(RARITIES[rarity].value * 1.2);
+  return prices.length ? Math.min(...prices) : round2(RARITIES[rarity].value * S.economy.r[rarity] * 1.15);
 }
 
 function seedMarket() {
   const bots = ['aria.k', 'no1collector', 'vault_9', 'kiwi.mints'];
   while (S.market.filter(l => l.seller !== 'you').length < 8) {
-    const rarity = rollRarity({ common: 30, rare: 32, epic: 22, legendary: 13, mythic: 3 });
+    const rarity = rollRarity({ common: 46, rare: 33, epic: 15, legendary: 5, mythic: 1 });
     const c = mintCreature(rarity);
+    const markup = 1.05 + Math.random() * 0.55;
     S.market.push({
-      id: uid(),
-      creature: c,
-      price: round2(fairValue(c) * (1.1 + Math.random() * 0.9)),
+      id: uid(), creature: c, markup,
+      price: round2(fairValue(c) * markup),
+      lastPrice: null,
       seller: pick(bots),
     });
   }
@@ -607,8 +826,9 @@ function buyListing(lid) {
     [{ name: `${l.creature.name} · from @${l.seller}`, price: l.price }],
     l.price,
     (usedBalance) => {
-      S.market.splice(i, 1);
+      S.market.splice(S.market.indexOf(l), 1);
       S.collection.push(l.creature);
+      bumpDemand(l.creature, 0.03);
       log('⇄', `Bought ${l.creature.name}`, usedBalance ? 'MINT Balance' : `From @${l.seller}`, -l.price);
       toast(`${l.creature.name} is yours`);
       seedMarket();
@@ -632,12 +852,12 @@ function openSell(id) {
     <div class="mini-vignette" style="${cardVars(c)}">${svgFor(c)}</div>
     <div class="sp-text">
       <strong>${c.name}</strong>
-      <span>${r.label} · No. ${String(c.serial).padStart(3, '0')} / ${MAX_SUPPLY}</span>
+      <span>${r.label} · No. ${String(c.serial).padStart(3, '0')} / ${SUPPLY[c.rarity]}</span>
     </div>`;
   $('#sellGuide').innerHTML = `
-    <div class="guide-cell"><small>Fair value</small><b>${money(fair)}</b></div>
+    <div class="guide-cell"><small>Live value</small><b>${money(fair)}</b></div>
     <div class="guide-cell"><small>${r.label} floor</small><b>${money(floor)}</b></div>
-    <div class="guide-cell"><small>Recent sales</small><b>${money(round2(fair * (0.95 + Math.random() * 0.25)))}</b></div>`;
+    <div class="guide-cell"><small>Supply left</small><b>${SUPPLY[c.rarity] - mintedCount(c.species, c.rarity)}</b></div>`;
   $('#sellPrice').value = round2(Math.min(fair * 1.1, floor * 0.98)).toFixed(2);
   updateSellBadge();
   $('#sellScrim').classList.add('open');
@@ -650,9 +870,9 @@ function updateSellBadge() {
   const badge = $('#sellBadge');
   badge.className = 'sell-badge ' + (ratio <= 1.15 ? 'fast' : ratio <= 1.6 ? 'fair' : 'high');
   badge.textContent =
-    ratio <= 1.15 ? 'Priced to sell — usually sells within minutes' :
+    ratio <= 1.15 ? 'Priced to sell — high demand at this price' :
     ratio <= 1.6  ? 'Fair price — may take a while' :
-                    'Above market — unlikely to sell at this price';
+                    'Above market — unlikely to sell unless the index climbs';
 }
 
 $('#sellPrice').addEventListener('input', updateSellBadge);
@@ -674,13 +894,11 @@ $('#sellConfirm').addEventListener('click', () => {
   const i = S.collection.findIndex(x => x.id === c.id);
   if (i === -1) return;
   S.collection.splice(i, 1);
-  const listing = { id: uid(), creature: c, price, seller: 'you' };
-  S.market.unshift(listing);
+  S.market.unshift({ id: uid(), creature: c, price, seller: 'you' });
   log('▤', `Listed ${c.name}`, `Asking ${money(price)}`, 0);
   toast(`${c.name} listed at ${money(price)}`);
   Sell.creature = null;
   $('#sellScrim').classList.remove('open');
-  scheduleBotBuy(listing);
   renderAll();
 });
 
@@ -693,36 +911,6 @@ function delist(lid) {
   renderAll();
 }
 
-function scheduleBotBuy(listing) {
-  const ratio = listing.price / fairValue(listing.creature);
-  if (ratio > 1.6) return;
-  const delay = ratio <= 1.15 ? rand(8, 20) : ratio <= 1.4 ? rand(20, 45) : rand(45, 75);
-  setTimeout(() => {
-    const i = S.market.findIndex(l => l.id === listing.id);
-    if (i === -1) return;
-    S.market.splice(i, 1);
-    S.balance = round2(S.balance + listing.price);
-    log('✓', `Sold ${listing.creature.name}`, `To @${pick(['aria.k','vault_9','no1collector','kiwi.mints'])}`, listing.price);
-    toast(`${listing.creature.name} sold for ${money(listing.price)}`);
-    renderAll();
-  }, delay * 1000);
-}
-
-/* ---------- withdraw ---------- */
-
-function openWithdraw() {
-  const amt = S.balance;
-  if (amt < 0.01) return toast('Nothing to withdraw yet');
-  PaySheet.open([{ name: 'Transfer to bank ···· 8231', price: amt }], amt, () => {
-    S.balance = 0;
-    log('⤓', 'Withdrawal', 'To bank ···· 8231', -amt);
-    toast(`${money(amt)} on its way to your bank`);
-    renderAll();
-  }, { allowBalance: false });
-}
-$('#withdrawBtn').addEventListener('click', openWithdraw);
-$('#walletWithdraw').addEventListener('click', openWithdraw);
-
 /* ---------- detail modal ---------- */
 
 function openDetail(id) {
@@ -731,13 +919,16 @@ function openDetail(id) {
   const r = RARITIES[c.rarity];
   const card = $('#detailCard');
   card.style.cssText = cardVars(c);
+  card.className = `detail-card frame-${c.rarity}`;
+  const left = SUPPLY[c.rarity] - mintedCount(c.species, c.rarity);
   card.innerHTML = `
     <button class="close-x" data-act="closeDetail" aria-label="Close">✕</button>
     <div class="card-mint">MINT</div>
     <div class="card-vignette">${svgFor(c)}</div>
     <h3>${c.name}</h3>
     <div class="card-epithet">${c.epithet}</div>
-    <p class="serial">${r.label} · No. ${String(c.serial).padStart(3, '0')} / ${MAX_SUPPLY} · minted ${new Date(c.mintedAt).toLocaleDateString('en-NZ')}</p>
+    <p class="serial">◆ ${r.label} · No. ${String(c.serial).padStart(3, '0')} / ${SUPPLY[c.rarity]} · ${left <= 0 ? 'tier sold out' : left + ' left to mint'}</p>
+    <p class="serial live-val">Live value ${money(fairValue(c))}</p>
     <div class="statbars">
       ${STATS.map(st => `
         <div class="statbar"><span>${st.toUpperCase().slice(0, 3)}</span>

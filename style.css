@@ -588,3 +588,113 @@ input[type="search"]{width:190px}
   .hero-critters svg{width:44px;height:44px}
   .tab-item span{font-size:9px}
 }
+
+/* ============ v5: economy UI ============ */
+.index-bar{
+  width:100%;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  background:var(--surface);border-radius:var(--r-md);padding:12px 16px;box-shadow:var(--shadow-sm);
+}
+.index-main{display:flex;align-items:center;gap:9px}
+.index-main small{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.index-main b{font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.chg{font-size:12px;font-weight:800;font-variant-numeric:tabular-nums}
+.chg.up,.pd.up,.trend-chip b.up{color:var(--green)}
+.chg.down,.pd.down,.trend-chip b.down{color:var(--red)}
+#sparkline{width:96px;height:26px}
+.trend-strip{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.trend-chip{
+  display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;
+  background:var(--canvas);border-radius:99px;padding:5px 10px;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;
+}
+.trend-chip i{width:7px;height:7px;border-radius:99px;display:inline-block}
+.pd{font-style:normal;font-size:10px;margin-right:2px}
+.sold-out{color:var(--red);font-weight:800;margin-left:5px;text-transform:uppercase;font-size:8.5px;letter-spacing:.05em}
+.low-supply{color:var(--amber);font-weight:800;margin-left:5px;font-size:8.5px;letter-spacing:.03em}
+.supply-note{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;font-weight:700;margin-top:10px;font-variant-numeric:tabular-nums}
+.live-val{font-weight:800;color:var(--ink)}
+
+/* ============ v5: rarity-standout frames ============ */
+/* rare — cool silver-blue foil edge */
+.frame-rare .card-face{
+  border-color:#9ec7f0;
+  background:linear-gradient(165deg,#f2f8ff, var(--pastel) 45%);
+}
+.frame-rare .card-face::before{border-color:#c5ddf5}
+/* epic — amethyst foil + faint sparkle field */
+.frame-epic .card-face{
+  border-color:#c39bea;
+  background:
+    radial-gradient(2px 2px at 18% 22%, rgba(180,139,232,.5), transparent 60%),
+    radial-gradient(1.6px 1.6px at 82% 30%, rgba(180,139,232,.45), transparent 60%),
+    radial-gradient(1.8px 1.8px at 70% 84%, rgba(180,139,232,.4), transparent 60%),
+    linear-gradient(165deg,#f8f2ff, var(--pastel) 50%);
+  box-shadow:0 4px 18px rgba(180,139,232,.22);
+}
+.frame-epic .card-face::before{border-color:#dcc3f2}
+/* legendary — gold filigree, warm glow, shimmer border */
+.frame-legendary .card-face{
+  border-color:#e5b345;
+  background:linear-gradient(160deg,#fdf6e3, var(--pastel) 55%);
+  box-shadow:0 0 0 1px rgba(229,179,69,.35),0 6px 26px rgba(229,179,69,.35);
+  animation:goldPulse 3.2s ease-in-out infinite;
+}
+@keyframes goldPulse{
+  0%,100%{box-shadow:0 0 0 1px rgba(229,179,69,.35),0 6px 22px rgba(229,179,69,.3)}
+  50%{box-shadow:0 0 0 1px rgba(229,179,69,.55),0 6px 34px rgba(229,179,69,.5)}
+}
+.frame-legendary .card-face::before{border-color:#eccb7a}
+.frame-legendary .card-mint{color:#b8860b}
+/* mythic — animated rainbow frame + prismatic overlay + glow pulse */
+.frame-mythic .card-face{
+  border-color:transparent;
+  background:
+    linear-gradient(var(--pastel),var(--pastel)) padding-box,
+    conic-gradient(from var(--spin,180deg),#7cb8f7,#b48be8,#f2799f,#e5b345,#8fd7b0,#7cb8f7) border-box;
+  animation:mythicGlow 2.6s ease-in-out infinite;
+}
+@keyframes mythicGlow{
+  0%,100%{box-shadow:0 6px 24px rgba(242,121,159,.35)}
+  33%{box-shadow:0 6px 28px rgba(180,139,232,.45)}
+  66%{box-shadow:0 6px 28px rgba(124,184,247,.45)}
+}
+.frame-mythic .card-face::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(115deg,rgba(124,184,247,.14) 20%,rgba(180,139,232,.14) 35%,rgba(242,121,159,.14) 50%,rgba(229,179,69,.14) 65%,rgba(143,215,176,.14) 80%);
+  background-size:300% 100%;animation:prismSlide 4s linear infinite;
+  mix-blend-mode:multiply;
+}
+@keyframes prismSlide{from{background-position:150% 0}to{background-position:-150% 0}}
+/* corner ornaments for legendary + mythic */
+.orn{
+  position:absolute;width:16px;height:16px;z-index:3;pointer-events:none;
+  border:2px solid #e5b345;opacity:.9;
+}
+.frame-mythic .orn{border-color:#b48be8}
+.orn.tl{top:7px;left:7px;border-right:none;border-bottom:none;border-radius:8px 0 0 0}
+.orn.tr{top:7px;right:7px;border-left:none;border-bottom:none;border-radius:0 8px 0 0}
+.orn.bl{bottom:7px;left:7px;border-right:none;border-top:none;border-radius:0 0 0 8px}
+.orn.br{bottom:7px;right:7px;border-left:none;border-top:none;border-radius:0 0 8px 0}
+.detail-card .orn{display:none}
+
+/* reveal scrim flashes for big pulls */
+.scrim.dark.goldglow{animation:goldFlash 1.4s ease}
+@keyframes goldFlash{
+  0%{background:rgba(38,30,48,.94)}
+  25%{background:rgba(120,92,30,.9)}
+  100%{background:rgba(38,30,48,.94)}
+}
+.scrim.dark.prism{animation:prismFlash 1.4s ease}
+@keyframes prismFlash{
+  0%{background:rgba(38,30,48,.94)}
+  20%{background:rgba(84,60,120,.92)}
+  40%{background:rgba(120,50,84,.92)}
+  60%{background:rgba(40,80,110,.92)}
+  100%{background:rgba(38,30,48,.94)}
+}
+
+@media (max-width:760px){
+  .index-bar{padding:10px 12px;gap:10px}
+  .trend-strip{margin-left:0;width:100%}
+  #sparkline{margin-left:auto}
+}
