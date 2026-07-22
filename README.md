@@ -161,3 +161,11 @@ block at the top of `app.js`.
 - Typography unjammed: epithets clamp to two tidy lines everywhere, card faces
   got rebalanced padding/sizes on small screens, footers wrap instead of
   colliding, and the detail modal scrolls within 90dvh.
+
+## v7.3 — mobile spotlight reveal
+
+On phones, packs now open one BIG card at a time: each card appears centre-stage
+at ~76vw, does its rarity charge-glow, flips with full-size type (22px name,
+readable epithet), holds for a rarity-scaled beat, then shrinks away into a
+horizontal tray of opened cards above the action bar. The desktop grid flow is
+unchanged. Tap the spotlight to fast-forward.

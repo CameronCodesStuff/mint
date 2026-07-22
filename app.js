@@ -842,6 +842,10 @@ async function runOpenSequence(packKey) {
   $('#openAnother').disabled = true;
   $('#packValueNum').textContent = '$0.00';
 
+  $('#spotlight').innerHTML = '';
+  $('#openedTray').innerHTML = '';
+  $('#revealStage').classList.remove('spot-mode');
+
   const wrap = $('#openPackWrap');
   wrap.classList.remove('bursting');
   $('#openPackArt').innerHTML = packSVG(packKey);
@@ -859,7 +863,58 @@ async function runOpenSequence(packKey) {
   autoReveal();
 }
 
+const isMobile = () => matchMedia('(max-width:760px)').matches;
+
+function revealCardHTML(c, i, extraStyle = '') {
+  const r = RARITIES[c.rarity];
+  return `<div class="reveal-card" data-i="${i}" style="${cardVars(c)};${extraStyle}">
+    <div class="reveal-inner">
+      <div class="reveal-face reveal-back"><div class="gem"></div></div>
+      <div class="reveal-face reveal-front frame-${c.rarity}">
+        <div class="card-mint">MINT</div>
+        <div class="card-vignette">${svgFor(c)}</div>
+        <div class="card-name">${c.name}</div>
+        <div class="card-epithet">${c.epithet}</div>
+        <span class="rname">◆ ${r.label} · No. ${c.serial} / ${SUPPLY[c.rarity]}</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+const HOLD_MS = { common: 700, rare: 850, epic: 1150, legendary: 1450, mythic: 1850, celestial: 2000, eternal: 2600 };
+
+async function runMobileSpotlight() {
+  $('#openIntro').style.display = 'none';
+  const stage = $('#revealStage');
+  stage.classList.add('on', 'spot-mode');
+  const spot = $('#spotlight');
+  spot.onclick = () => { speedMult = 0.25; };
+  let total = 0;
+  await sleep(250);
+  for (let i = 0; i < pendingPack.length; i++) {
+    const c = pendingPack[i];
+    spot.innerHTML = revealCardHTML(c, i);
+    const card = spot.querySelector('.reveal-card');
+    await sleep(220);
+    card.classList.add('charging');
+    if (!['common', 'rare'].includes(c.rarity)) card.classList.add('big-charge');
+    await sleep(CHARGE_MS[c.rarity]);
+    card.classList.remove('charging', 'big-charge');
+    flipCard(card, c);
+    total = round2(total + fairValue(c));
+    animateValue(total);
+    await sleep(HOLD_MS[c.rarity]);
+    card.classList.add('to-tray');
+    await sleep(340);
+    $('#openedTray').insertAdjacentHTML('beforeend',
+      `<div class="tray-card" style="${cardVars(c)}">${svgFor(c)}</div>`);
+    spot.innerHTML = '';
+  }
+  finishReveal(total);
+}
+
 function autoReveal() {
+  if (isMobile()) return runMobileSpotlight();
   $('#openIntro').style.display = 'none';
   const stage = $('#revealStage');
   stage.classList.add('on');
