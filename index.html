@@ -28,6 +28,7 @@
     <button class="nav-link active" data-tab="shop">Shop</button>
     <button class="nav-link" data-tab="collection">Collection <span class="count" id="collCount">0</span></button>
     <button class="nav-link" data-tab="market">Market</button>
+    <button class="nav-link" data-tab="ranks">Ranks</button>
     <button class="nav-link" data-tab="wallet">Wallet</button>
     <button class="nav-link" data-tab="activity">Activity</button>
   </nav>
@@ -38,6 +39,14 @@
     </div>
     <button class="btn btn-dark btn-sm" id="depositBtn">Add funds</button>
     <button class="btn btn-quiet btn-sm" id="withdrawBtn">Withdraw · Coming soon</button>
+    <button class="bell" id="tradesBell" aria-label="Trades">
+      <svg viewBox="0 0 24 24"><path d="M7 10h10M7 10l3-3M7 10l3 3M17 15H7m10 0-3-3m3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="bell-badge" id="tradesBadge" hidden>0</span>
+    </button>
+    <button class="account-chip" id="accountChip" aria-label="Your profile">
+      <img id="accountAvatar" alt="">
+      <span id="accountName">…</span>
+    </button>
   </div>
 </header>
 
@@ -171,6 +180,42 @@
     </div>
   </section>
 
+  <!-- RANKS -->
+  <section class="panel" id="tab-ranks">
+    <div class="panel-head">
+      <h2>Leaderboards</h2>
+      <button class="btn btn-quiet btn-sm" id="ranksRefresh">Refresh</button>
+    </div>
+    <div class="ranks-grid">
+      <div class="board">
+        <h3><span class="board-emoji">💰</span> Richest cash</h3>
+        <div class="board-list" id="boardCash"><div class="act-empty">Loading…</div></div>
+      </div>
+      <div class="board">
+        <h3><span class="board-emoji">👑</span> Richest accounts</h3>
+        <p class="board-sub">Cash + collection at live value</p>
+        <div class="board-list" id="boardValue"><div class="act-empty">Loading…</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROFILE -->
+  <section class="panel" id="tab-profile">
+    <div class="profile-banner" id="profileBanner">
+      <div class="pf-avatar-wrap">
+        <img id="profileAvatar" alt="Profile picture">
+        <button class="pf-edit" id="avatarEdit" hidden aria-label="Change photo">✎</button>
+        <input type="file" id="avatarFile" accept="image/*" hidden>
+      </div>
+      <h2 id="profileName"></h2>
+      <p class="pf-meta" id="profileMeta"></p>
+      <div class="pf-actions" id="profileActions"></div>
+    </div>
+    <div class="wallet-stats pf-stats" id="profileStats"></div>
+    <div class="section-head"><h3 id="showcaseTitle">Showcase</h3></div>
+    <div class="grid" id="profileShowcase"></div>
+  </section>
+
   <!-- ACTIVITY -->
   <section class="panel" id="tab-activity">
     <div class="panel-head"><h2>Activity</h2></div>
@@ -297,14 +342,86 @@
     <svg viewBox="0 0 24 24"><rect x="4" y="5" width="10" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 7l4 1-3 12-4-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
     <span>Cards</span>
   </button>
-  <button class="tab-item" data-tab="activity">
-    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-    <span>Activity</span>
+  <button class="tab-item" data-tab="ranks">
+    <svg viewBox="0 0 24 24"><path d="M8 4h8v3a4 4 0 0 1-8 0V4zM8 5H5v1a3 3 0 0 0 3 3M16 5h3v1a3 3 0 0 1-3 3M12 11v4m-3 5h6m-3-5v5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span>Ranks</span>
   </button>
 </nav>
 
+<!-- Trades inbox -->
+<div class="scrim" id="tradesScrim">
+  <div class="pay-sheet wide" role="dialog" aria-modal="true" aria-label="Trades">
+    <div class="sheet-grab"></div>
+    <div class="pay-head">
+      <span class="pay-logo">Trades</span>
+      <button class="close-x" data-close="tradesScrim" aria-label="Close">✕</button>
+    </div>
+    <div class="trades-list" id="tradesList"></div>
+  </div>
+</div>
+
+<!-- Trade composer -->
+<div class="scrim" id="tradeScrim">
+  <div class="pay-sheet wide" role="dialog" aria-modal="true" aria-label="Propose trade">
+    <div class="sheet-grab"></div>
+    <div class="pay-head">
+      <span class="pay-logo">Trade with <b id="tradeTheirName"></b></span>
+      <button class="close-x" data-close="tradeScrim" aria-label="Cancel">✕</button>
+    </div>
+    <div class="trade-cols">
+      <div class="trade-col">
+        <h4>You give</h4>
+        <div class="trade-pick" id="tradeMyCards"></div>
+        <div class="custom-amt slim"><span>$</span><input type="number" id="tradeMyCash" min="0" step="0.5" value="0" inputmode="decimal" aria-label="Cash you give"><small>cash</small></div>
+      </div>
+      <div class="trade-arrow">⇄</div>
+      <div class="trade-col">
+        <h4>You get</h4>
+        <div class="trade-pick" id="tradeTheirCards"></div>
+        <div class="custom-amt slim"><span>$</span><input type="number" id="tradeTheirCash" min="0" step="0.5" value="0" inputmode="decimal" aria-label="Cash you get"><small>cash</small></div>
+      </div>
+    </div>
+    <div class="trade-summary" id="tradeSummary"></div>
+    <button class="btn btn-paynow" id="tradeSend">Send trade offer</button>
+  </div>
+</div>
+
+<!-- Auth screen -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-critters" id="authCritters"></div>
+  <div class="auth-card" id="authCard">
+    <div class="auth-logo">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 22c0-5.5 0-8.5 0-10" fill="none" stroke="#3aa572" stroke-width="2.2" stroke-linecap="round"/>
+        <path d="M12 12C12 6.5 15.5 3.5 20 3.5 20 9 16.5 12 12 12Z" fill="#4cbf87"/>
+        <path d="M12 12C12 6.5 8.5 3.5 4 3.5 4 9 7.5 12 12 12Z" fill="#6fd6a3"/>
+      </svg>
+      <span>MINT</span>
+    </div>
+    <h2 id="authTitle">Welcome back</h2>
+    <p class="auth-sub" id="authSub">Sign in to your collection.</p>
+    <div class="auth-tabs">
+      <span class="auth-tab-pill" id="authTabPill"></span>
+      <button class="auth-tab active" data-mode="signin">Sign in</button>
+      <button class="auth-tab" data-mode="signup">Create account</button>
+    </div>
+    <div class="auth-fields">
+      <input id="authName" class="auth-input" placeholder="Username" maxlength="20" autocomplete="nickname" hidden>
+      <input id="authEmail" type="email" class="auth-input" placeholder="Email" autocomplete="email">
+      <input id="authPass" type="password" class="auth-input" placeholder="Password" autocomplete="current-password">
+    </div>
+    <p class="auth-error" id="authError" hidden></p>
+    <button class="btn btn-dark auth-primary" id="authSubmit"><span id="authSubmitText">Sign in</span><span class="mini-spin" id="authSpin" hidden></span></button>
+    <div class="auth-divider"><span>or</span></div>
+    <button class="auth-google" id="authGoogle">
+      <svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M23.5 12.3c0-.9-.1-1.5-.3-2.2H12v4.1h6.5c-.1 1.1-.8 2.7-2.4 3.8l3.7 2.9c2.2-2.1 3.7-5.1 3.7-8.6z"/><path fill="#34A853" d="M12 24c3.2 0 5.9-1.1 7.9-2.9l-3.7-2.9c-1 .7-2.4 1.2-4.2 1.2-3.2 0-5.9-2.1-6.8-5.1L1.3 17.2C3.3 21.2 7.3 24 12 24z"/><path fill="#FBBC05" d="M5.2 14.3c-.2-.7-.4-1.5-.4-2.3s.1-1.6.4-2.3L1.3 6.8C.5 8.4 0 10.1 0 12s.5 3.6 1.3 5.2l3.9-2.9z"/><path fill="#EA4335" d="M12 4.7c1.8 0 3 .8 3.7 1.4l3.3-3.2C17.9 1.1 15.2 0 12 0 7.3 0 3.3 2.8 1.3 6.8l3.9 2.9c.9-3 3.6-5 6.8-5z"/></svg>
+      Continue with Google
+    </button>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<script src="app.js"></script>
+<script type="module" src="app.js"></script>
 </body>
 </html>

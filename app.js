@@ -1,3 +1,32 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js";
+import {
+  getAuth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword,
+  GoogleAuthProvider, signInWithPopup, signOut, updateProfile
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js";
+import {
+  getFirestore, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection as fsCollection,
+  query, where, orderBy, limit, onSnapshot, runTransaction, getDocs, increment, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js";
+import { getDatabase, ref as rtdbRef, set as rtdbSet, get as rtdbGet } from "https://www.gstatic.com/firebasejs/12.16.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDiQG0C67cNYawqao2nAHYuTFkXmPnA_Fs",
+  authDomain: "mint-2f84d.firebaseapp.com",
+  databaseURL: "https://mint-2f84d-default-rtdb.firebaseio.com",
+  projectId: "mint-2f84d",
+  storageBucket: "mint-2f84d.firebasestorage.app",
+  messagingSenderId: "972508330792",
+  appId: "1:972508330792:web:618f87301da07406b86e1d",
+  measurementId: "G-9TF6899XH1"
+};
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = getFirestore(fbApp);
+const rtdb = getDatabase(fbApp);
+let FBUser = null;                 // firebase auth user
+let Me = null;                     // { uid, username }
+const Avatars = {};                // uid -> dataURL cache
+
 /* ============================================================
    MINT v5 — vanilla JS, no deps.
    New in v5:
@@ -84,7 +113,7 @@ const sPick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 /* ---------- storage ---------- */
 
 const Store = {
-  KEY: 'mint_v6',
+  KEY: 'mint_v8_anon',
   mem: null,
   load() { try { return JSON.parse(localStorage.getItem(this.KEY)) || null; } catch { return this.mem; } },
   save(s) { this.mem = s; try { localStorage.setItem(this.KEY, JSON.stringify(s)); } catch {} },
@@ -110,7 +139,25 @@ for (const k of Object.keys(RARITIES)) {
   if (S.economy.r[k] == null) S.economy.r[k] = 1;
   if (S.economy.drift[k] == null) S.economy.drift[k] = 0;
 }
-const persist = () => Store.save(S);
+let cloudTimer = null, applyingRemote = false;
+function scheduleCloudSave() {
+  if (!FBUser || applyingRemote) return;
+  clearTimeout(cloudTimer);
+  cloudTimer = setTimeout(async () => {
+    try {
+      const portfolio = round2(S.collection.reduce((sum, c) => sum + fairValue(c), 0));
+      await setDoc(doc(db, 'users', FBUser.uid), {
+        username: Me?.username || 'collector',
+        usernameLower: (Me?.username || 'collector').toLowerCase(),
+        balance: S.balance,
+        collection: S.collection,
+        accountValue: round2(S.balance + portfolio),
+        updatedAt: Date.now(),
+      }, { merge: true });
+    } catch (e) { console.warn('cloud save failed', e); }
+  }, 900);
+}
+const persist = () => { Store.save(S); scheduleCloudSave(); };
 
 /* ---------- economy ---------- */
 
@@ -139,6 +186,7 @@ function compositeIndex() {
 }
 
 function economyTick() {
+  if (!FBUser) return;
   const e = S.economy;
   for (const k of Object.keys(RARITIES)) {
     e.r[k] = clamp(e.r[k] * (1 + (Math.random() - 0.5) * 0.022 + e.drift[k]), 0.55, 3.2);
@@ -153,23 +201,17 @@ function economyTick() {
 
   // bot listings float with the market
   for (const l of S.market) {
-    if (l.seller === 'you') continue;
+    if (!l.bot) continue;
     l.lastPrice = l.price;
     l.price = round2(fairValue(l.creature) * l.markup);
   }
 
-  // your listings: probabilistic sales vs live fair value
+  // your live listings: probabilistic sales vs live fair value
   for (const l of [...S.market]) {
-    if (l.seller !== 'you') continue;
+    if (!isMine(l)) continue;
     const ratio = l.price / fairValue(l.creature);
     const p = ratio <= 1 ? 0.5 : ratio <= 1.15 ? 0.3 : ratio <= 1.4 ? 0.12 : ratio <= 1.6 ? 0.05 : 0;
-    if (Math.random() < p) {
-      S.market.splice(S.market.indexOf(l), 1);
-      S.balance = round2(S.balance + l.price);
-      bumpDemand(l.creature, 0.02);
-      log('✓', `Sold ${l.creature.name}`, `To @${pick(['aria.k','vault_9','no1collector','kiwi.mints'])}`, l.price);
-      toast(`${l.creature.name} sold for ${money(l.price)}`);
-    }
+    if (Math.random() < p) botBuyMyListing(l);
   }
 
   renderMarket(); renderFeatured(); renderIndex(); renderWalletPage(); renderWallet();
@@ -664,7 +706,7 @@ function renderCollection() {
 }
 
 function priceDelta(l) {
-  if (l.seller === 'you' || !l.lastPrice || l.lastPrice === l.price) return '';
+  if (isMine(l) || !l.lastPrice || l.lastPrice === l.price) return '';
   const up = l.price > l.lastPrice;
   return `<i class="pd ${up ? 'up' : 'down'}">${up ? '▲' : '▼'}</i>`;
 }
@@ -681,19 +723,21 @@ function marketFilters(l) {
   return true;
 }
 
+const isMine = l => l.sellerUid && FBUser && l.sellerUid === FBUser.uid;
+
 function renderMarket() {
   const visible = S.market.filter(marketFilters);
-  $('#marketGrid').innerHTML = visible.map(l => monCardHTML(l.creature, l.seller === 'you'
+  $('#marketGrid').innerHTML = visible.map(l => monCardHTML(l.creature, isMine(l)
     ? `<button class="btn btn-quiet" data-act="delist" data-lid="${l.id}">Delist · ${money(l.price)}</button>`
     : `<button class="btn btn-dark" data-act="buy" data-lid="${l.id}">${priceDelta(l)}&nbsp;${money(l.price)}</button>`
   )).join('');
-  const others = S.market.filter(l => l.seller !== 'you');
+  const others = S.market.filter(l => !isMine(l));
   const floor = others.length ? Math.min(...others.map(l => l.price)) : 0;
   $('#marketStats').textContent = `${visible.length} of ${S.market.length} listings · floor ${money(floor)}`;
 }
 
 function renderFeatured() {
-  const featured = S.market.filter(l => l.seller !== 'you').slice(0, 5);
+  const featured = S.market.filter(l => !isMine(l)).slice(0, 5);
   $('#featuredGrid').innerHTML = featured.map(l => monCardHTML(l.creature, `
     <button class="btn btn-quiet" data-act="view" data-id="${l.creature.id}">View</button>
     <button class="btn btn-dark" data-act="buy" data-lid="${l.id}">${money(l.price)}</button>
@@ -755,7 +799,7 @@ function renderHero() {
 function renderWalletPage() {
   $('#walletBalance').textContent = money(S.balance);
   const portfolio = round2(S.collection.reduce((sum, c) => sum + fairValue(c), 0));
-  const myListings = S.market.filter(l => l.seller === 'you');
+  const myListings = S.market.filter(l => isMine(l));
   const listedValue = round2(myListings.reduce((sum, l) => sum + l.price, 0));
   const spent = round2(S.activity.filter(e => e.amt < 0 && e.title !== 'Withdrawal').reduce((s, e) => s - e.amt, 0));
   const earned = round2(S.activity.filter(e => e.amt > 0 && e.title !== 'Deposit').reduce((s, e) => s + e.amt, 0));
@@ -1031,18 +1075,18 @@ $('#openAnother').addEventListener('click', () => {
 /* ---------- market ---------- */
 
 function rarityFloor(rarity) {
-  const prices = S.market.filter(l => l.seller !== 'you' && l.creature.rarity === rarity).map(l => l.price);
+  const prices = S.market.filter(l => !isMine(l) && l.creature.rarity === rarity).map(l => l.price);
   return prices.length ? Math.min(...prices) : round2(RARITIES[rarity].value * S.economy.r[rarity] * 1.15);
 }
 
 function seedMarket() {
   const bots = ['aria.k', 'no1collector', 'vault_9', 'kiwi.mints'];
-  while (S.market.filter(l => l.seller !== 'you').length < 8) {
+  while (S.market.filter(l => l.bot).length < 8) {
     const rarity = rollRarity({ common: 46, rare: 33, epic: 15, legendary: 5, mythic: 1 });
     const c = mintCreature(rarity);
     const markup = 1.05 + Math.random() * 0.55;
     S.market.push({
-      id: uid(), creature: c, markup,
+      id: uid(), creature: c, markup, bot: true,
       price: round2(fairValue(c) * markup),
       lastPrice: null,
       seller: pick(bots),
@@ -1051,14 +1095,30 @@ function seedMarket() {
 }
 
 function buyListing(lid) {
-  const i = S.market.findIndex(l => l.id === lid);
-  if (i === -1) return;
-  const l = S.market[i];
+  const l = S.market.find(x => x.id === lid);
+  if (!l || isMine(l)) return;
   PaySheet.open(
     [{ name: `${l.creature.name} · from @${l.seller}`, price: l.price }],
     l.price,
-    (usedBalance) => {
-      S.market.splice(S.market.indexOf(l), 1);
+    async (usedBalance) => {
+      if (l.docId) {
+        // real listing: transact — remove listing, credit seller
+        try {
+          await runTransaction(db, async tx => {
+            const lRef = doc(db, 'market', l.docId);
+            const snap = await tx.get(lRef);
+            if (!snap.exists()) throw new Error('gone');
+            const sRef = doc(db, 'users', l.sellerUid);
+            const sSnap = await tx.get(sRef);
+            tx.delete(lRef);
+            if (sSnap.exists()) tx.update(sRef, { balance: round2((sSnap.data().balance || 0) + l.price), updatedAt: Date.now() });
+          });
+        } catch {
+          toast('Too slow — that card was already bought');
+          return;
+        }
+      }
+      S.market = S.market.filter(x => x.id !== l.id);
       S.collection.push(l.creature);
       bumpDemand(l.creature, 0.03);
       log('⇄', `Bought ${l.creature.name}`, usedBalance ? 'MINT Balance' : `From @${l.seller}`, -l.price);
@@ -1119,14 +1179,21 @@ $('#stepUp').addEventListener('click', () => {
   updateSellBadge();
 });
 
-$('#sellConfirm').addEventListener('click', () => {
+$('#sellConfirm').addEventListener('click', async () => {
   const c = Sell.creature;
   const price = round2(parseFloat($('#sellPrice').value));
   if (!c || !price || price < 0.5) return toast('Set a price of at least $0.50');
   const i = S.collection.findIndex(x => x.id === c.id);
   if (i === -1) return;
   S.collection.splice(i, 1);
-  S.market.unshift({ id: uid(), creature: c, price, seller: 'you' });
+  try {
+    await addDoc(fsCollection(db, 'market'), {
+      creature: c, price, sellerUid: FBUser.uid, sellerName: Me.username, createdAt: Date.now(),
+    });
+  } catch (e) {
+    S.collection.push(c);
+    return toast('Could not list right now — try again');
+  }
   log('▤', `Listed ${c.name}`, `Asking ${money(price)}`, 0);
   toast(`${c.name} listed at ${money(price)}`);
   Sell.creature = null;
@@ -1134,12 +1201,23 @@ $('#sellConfirm').addEventListener('click', () => {
   renderAll();
 });
 
-function delist(lid) {
-  const i = S.market.findIndex(l => l.id === lid && l.seller === 'you');
-  if (i === -1) return;
-  const l = S.market.splice(i, 1)[0];
+async function delist(lid) {
+  const l = S.market.find(x => x.id === lid && isMine(x));
+  if (!l) return;
+  try { await deleteDoc(doc(db, 'market', l.docId)); } catch { return toast('Could not delist — try again'); }
   S.collection.push(l.creature);
+  S.market = S.market.filter(x => x.id !== lid);
   toast(`${l.creature.name} returned to your collection`);
+  renderAll();
+}
+
+async function botBuyMyListing(l) {
+  try { await deleteDoc(doc(db, 'market', l.docId)); } catch { return; }
+  S.market = S.market.filter(x => x.id !== l.id);
+  S.balance = round2(S.balance + l.price);
+  bumpDemand(l.creature, 0.02);
+  log('✓', `Sold ${l.creature.name}`, `To @${pick(['aria.k','vault_9','no1collector','kiwi.mints'])}`, l.price);
+  toast(`${l.creature.name} sold for ${money(l.price)}`);
   renderAll();
 }
 
@@ -1205,11 +1283,484 @@ $('#speciesFilter').addEventListener('change', renderMarket);
 
 /* ---------- boot ---------- */
 
-$('#speciesFilter').insertAdjacentHTML('beforeend',
-  SPECIES.map(sp => `<option value="${sp.id}">${sp.label}</option>`).join(''));
-$('#packArtStandard').innerHTML = packSVG('standard');
-$('#packArtPremium').innerHTML = packSVG('premium');
-seedMarket();
-renderOdds();
-renderHero();
-renderAll();
+/* ============================================================
+   ACCOUNTS · PROFILES · TRADING · LEADERBOARDS  (Firebase)
+   ============================================================ */
+
+/* ---------- avatars (RTDB, base64) ---------- */
+
+function defaultAvatar(name) {
+  let h = 0; for (const ch of (name || 'mint')) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  const initial = (name || 'M')[0].toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+    <rect width="64" height="64" rx="32" fill="hsl(${h} 70% 84%)"/>
+    <circle cx="32" cy="30" r="15" fill="#fff" opacity=".92"/>
+    <text x="32" y="37" text-anchor="middle" font-family="sans-serif" font-weight="800" font-size="19" fill="hsl(${h} 45% 45%)">${initial}</text>
+    <ellipse cx="22" cy="34" rx="3.4" ry="2" fill="#f7a8bc" opacity=".7"/>
+    <ellipse cx="42" cy="34" rx="3.4" ry="2" fill="#f7a8bc" opacity=".7"/>
+  </svg>`;
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
+async function getAvatar(uidKey, name) {
+  if (Avatars[uidKey]) return Avatars[uidKey];
+  try {
+    const snap = await rtdbGet(rtdbRef(rtdb, 'avatars/' + uidKey));
+    if (snap.exists()) { Avatars[uidKey] = snap.val(); return Avatars[uidKey]; }
+  } catch {}
+  Avatars[uidKey] = defaultAvatar(name);
+  return Avatars[uidKey];
+}
+
+function fillAvatar(imgEl, uidKey, name) {
+  imgEl.src = Avatars[uidKey] || defaultAvatar(name);
+  getAvatar(uidKey, name).then(url => { imgEl.src = url; });
+}
+
+$('#avatarEdit').addEventListener('click', () => $('#avatarFile').click());
+$('#avatarFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = async () => {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 96;
+    const ctx = cv.getContext('2d');
+    const s = Math.min(img.width, img.height);
+    ctx.drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 96, 96);
+    const url = cv.toDataURL('image/jpeg', 0.82);
+    try {
+      await rtdbSet(rtdbRef(rtdb, 'avatars/' + FBUser.uid), url);
+      Avatars[FBUser.uid] = url;
+      fillAvatar($('#profileAvatar'), FBUser.uid, Me.username);
+      fillAvatar($('#accountAvatar'), FBUser.uid, Me.username);
+      toast('Looking great — photo updated');
+    } catch { toast('Could not save the photo — try a smaller image'); }
+  };
+  img.src = URL.createObjectURL(file);
+  e.target.value = '';
+});
+
+/* ---------- profiles ---------- */
+
+let viewingProfile = null; // { uid, username, balance, collection, accountValue, createdAt }
+
+function renderHeaderAccount() {
+  $('#accountName').textContent = Me?.username || '…';
+  fillAvatar($('#accountAvatar'), FBUser.uid, Me?.username);
+}
+
+async function openProfile(uidKey) {
+  let target;
+  if (uidKey === FBUser.uid) {
+    const portfolio = round2(S.collection.reduce((s, c) => s + fairValue(c), 0));
+    target = { uid: uidKey, username: Me.username, balance: S.balance, collection: S.collection,
+               accountValue: round2(S.balance + portfolio), createdAt: Me.createdAt };
+  } else {
+    const snap = await getDoc(doc(db, 'users', uidKey));
+    if (!snap.exists()) return toast('Could not load that profile');
+    target = { uid: uidKey, ...snap.data() };
+  }
+  viewingProfile = target;
+  const own = uidKey === FBUser.uid;
+  let hue = 0; for (const ch of target.username) hue = (hue * 31 + ch.charCodeAt(0)) % 360;
+  $('#profileBanner').style.setProperty('--pfh', hue);
+  fillAvatar($('#profileAvatar'), uidKey, target.username);
+  $('#avatarEdit').hidden = !own;
+  $('#profileName').textContent = target.username;
+  const joined = target.createdAt ? new Date(target.createdAt).toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' }) : 'a while ago';
+  $('#profileMeta').textContent = `Collector since ${joined}`;
+  $('#profileActions').innerHTML = own
+    ? `<button class="btn btn-quiet btn-sm" id="signOutBtn">Sign out</button>`
+    : `<button class="btn btn-dark btn-sm" data-trade-uid="${uidKey}">⇄ Propose trade</button>`;
+  if (own) $('#signOutBtn').addEventListener('click', () => signOut(auth));
+
+  const coll = target.collection || [];
+  const portfolio = round2(coll.reduce((s, c) => s + fairValue(c), 0));
+  const best = coll.length ? coll.reduce((a, b) => RARITIES[b.rarity].value > RARITIES[a.rarity].value ? b : a) : null;
+  $('#profileStats').innerHTML = `
+    <div class="wstat"><small>Account value</small><b>${money(round2((target.balance || 0) + portfolio))}</b><span>cash + collection</span></div>
+    <div class="wstat"><small>Cards</small><b>${coll.length}</b><span>${best ? 'best: ' + best.name : 'no cards yet'}</span></div>
+    <div class="wstat"><small>Cash</small><b>${money(target.balance || 0)}</b><span>MINT balance</span></div>`;
+  const order = { eternal: 0, celestial: 1, mythic: 2, legendary: 3, epic: 4, rare: 5, common: 6 };
+  const showcase = [...coll].sort((a, b) => order[a.rarity] - order[b.rarity] || b.stats.power - a.stats.power).slice(0, 6);
+  $('#showcaseTitle').textContent = own ? 'Your showcase' : `${target.username}'s showcase`;
+  $('#profileShowcase').innerHTML = showcase.length
+    ? showcase.map(c => monCardHTML(c, `<button class="btn btn-quiet" data-act="viewpf" data-id="${c.id}">View</button>`)).join('')
+    : '<div class="act-empty">Nothing to show yet</div>';
+  switchTab('profile');
+}
+
+$('#accountChip').addEventListener('click', () => openProfile(FBUser.uid));
+
+/* ---------- leaderboards ---------- */
+
+async function loadRanks() {
+  const render = async (elId, field, rows) => {
+    $('#' + elId).innerHTML = rows.length ? (await Promise.all(rows.map(async (u, i) => {
+      const medal = ['🥇', '🥈', '🥉'][i] || `<b class="rank-n">${i + 1}</b>`;
+      const av = await getAvatar(u.uid, u.username);
+      return `<button class="board-row${u.uid === FBUser.uid ? ' me' : ''}" data-profile-uid="${u.uid}" style="--d:${i * 0.05}s">
+        <span class="medal">${medal}</span>
+        <img src="${av}" alt="">
+        <span class="board-name">${u.username || 'collector'}</span>
+        <b class="board-val">${money(u[field] || 0)}</b>
+      </button>`;
+    }))).join('') : '<div class="act-empty">No collectors yet — be the first!</div>';
+  };
+  try {
+    const [cashSnap, valSnap] = await Promise.all([
+      getDocs(query(fsCollection(db, 'users'), orderBy('balance', 'desc'), limit(10))),
+      getDocs(query(fsCollection(db, 'users'), orderBy('accountValue', 'desc'), limit(10))),
+    ]);
+    const mapRows = snap => snap.docs.map(d => ({ uid: d.id, ...d.data() }));
+    await render('boardCash', 'balance', mapRows(cashSnap));
+    await render('boardValue', 'accountValue', mapRows(valSnap));
+  } catch (e) {
+    console.warn(e);
+    $('#boardCash').innerHTML = $('#boardValue').innerHTML = '<div class="act-empty">Could not load leaderboards</div>';
+  }
+}
+$('#ranksRefresh').addEventListener('click', loadRanks);
+
+/* ---------- trading ---------- */
+
+const TradeDraft = { their: null, giveIds: new Set(), getIds: new Set() };
+
+async function openTradeComposer(theirUid) {
+  const snap = await getDoc(doc(db, 'users', theirUid));
+  if (!snap.exists()) return toast('Could not load that collector');
+  TradeDraft.their = { uid: theirUid, ...snap.data() };
+  TradeDraft.giveIds.clear(); TradeDraft.getIds.clear();
+  $('#tradeTheirName').textContent = TradeDraft.their.username;
+  $('#tradeMyCash').value = 0; $('#tradeTheirCash').value = 0;
+  renderTradePickers();
+  $('#tradeScrim').classList.add('open');
+}
+
+function tradeMini(c, side) {
+  return `<button class="pickcard" data-pick="${side}" data-id="${c.id}" style="${cardVars(c)}" title="${c.name}">
+    ${svgFor(c)}<span>${c.name}</span></button>`;
+}
+
+function renderTradePickers() {
+  $('#tradeMyCards').innerHTML = S.collection.length
+    ? S.collection.map(c => tradeMini(c, 'give')).join('') : '<span class="pick-empty">No cards</span>';
+  $('#tradeTheirCards').innerHTML = (TradeDraft.their.collection || []).length
+    ? TradeDraft.their.collection.map(c => tradeMini(c, 'get')).join('') : '<span class="pick-empty">They have no cards</span>';
+  syncTradeSelection();
+}
+
+function syncTradeSelection() {
+  $$('#tradeMyCards .pickcard').forEach(b => b.classList.toggle('picked', TradeDraft.giveIds.has(b.dataset.id)));
+  $$('#tradeTheirCards .pickcard').forEach(b => b.classList.toggle('picked', TradeDraft.getIds.has(b.dataset.id)));
+  const gv = [...TradeDraft.giveIds].reduce((s, id) => s + fairValue(S.collection.find(c => c.id === id)), 0) + (parseFloat($('#tradeMyCash').value) || 0);
+  const rv = [...TradeDraft.getIds].reduce((s, id) => s + fairValue(TradeDraft.their.collection.find(c => c.id === id)), 0) + (parseFloat($('#tradeTheirCash').value) || 0);
+  $('#tradeSummary').innerHTML = `You give <b>${money(round2(gv))}</b> · you get <b>${money(round2(rv))}</b> in live value`;
+}
+$('#tradeMyCash').addEventListener('input', syncTradeSelection);
+$('#tradeTheirCash').addEventListener('input', syncTradeSelection);
+
+document.addEventListener('click', e => {
+  const pk = e.target.closest('.pickcard');
+  if (pk) {
+    const set = pk.dataset.pick === 'give' ? TradeDraft.giveIds : TradeDraft.getIds;
+    set.has(pk.dataset.id) ? set.delete(pk.dataset.id) : set.add(pk.dataset.id);
+    syncTradeSelection();
+    return;
+  }
+  const tb = e.target.closest('[data-trade-uid]');
+  if (tb) return openTradeComposer(tb.dataset.tradeUid);
+  const pr = e.target.closest('[data-profile-uid]');
+  if (pr) return openProfile(pr.dataset.profileUid);
+});
+
+$('#tradeSend').addEventListener('click', async () => {
+  const giveCash = round2(parseFloat($('#tradeMyCash').value) || 0);
+  const getCash = round2(parseFloat($('#tradeTheirCash').value) || 0);
+  if (!TradeDraft.giveIds.size && !TradeDraft.getIds.size && !giveCash && !getCash) return toast('Pick something to trade first');
+  if (giveCash > S.balance) return toast("You don't have that much cash");
+  try {
+    await addDoc(fsCollection(db, 'trades'), {
+      fromUid: FBUser.uid, fromName: Me.username,
+      toUid: TradeDraft.their.uid, toName: TradeDraft.their.username,
+      give: { cards: S.collection.filter(c => TradeDraft.giveIds.has(c.id)), cash: giveCash },
+      get:  { cards: TradeDraft.their.collection.filter(c => TradeDraft.getIds.has(c.id)), cash: getCash },
+      status: 'pending', t: Date.now(),
+    });
+    $('#tradeScrim').classList.remove('open');
+    toast(`Trade offer sent to ${TradeDraft.their.username}`);
+  } catch { toast('Could not send the trade — try again'); }
+});
+
+/* trades inbox */
+let incomingTrades = [], outgoingTrades = [];
+
+function watchTrades() {
+  onSnapshot(query(fsCollection(db, 'trades'), where('toUid', '==', FBUser.uid), where('status', '==', 'pending')), snap => {
+    incomingTrades = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const badge = $('#tradesBadge');
+    badge.hidden = incomingTrades.length === 0;
+    badge.textContent = incomingTrades.length;
+    if ($('#tradesScrim').classList.contains('open')) renderTradesList();
+  });
+  onSnapshot(query(fsCollection(db, 'trades'), where('fromUid', '==', FBUser.uid), where('status', '==', 'pending')), snap => {
+    outgoingTrades = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    if ($('#tradesScrim').classList.contains('open')) renderTradesList();
+  });
+}
+
+function tradeRowHTML(t, dir) {
+  const who = dir === 'in' ? t.fromName : t.toName;
+  const mineSide = dir === 'in' ? t.get : t.give;   // what *I* hand over
+  const theirsSide = dir === 'in' ? t.give : t.get; // what *I* receive
+  const sum = side => [side.cards.length ? `${side.cards.length} card${side.cards.length > 1 ? 's' : ''}` : '', side.cash ? money(side.cash) : ''].filter(Boolean).join(' + ') || 'nothing';
+  const cardsPreview = side => side.cards.slice(0, 4).map(c => `<span class="trade-thumb" style="${cardVars(c)}">${svgFor(c)}</span>`).join('');
+  return `<div class="trade-row">
+    <div class="trade-row-head"><b>${dir === 'in' ? 'From' : 'To'} @${who}</b><span>${new Date(t.t).toLocaleDateString('en-NZ')}</span></div>
+    <div class="trade-row-body">
+      <div>${cardsPreview(theirsSide)}<small>you get ${sum(theirsSide)}</small></div>
+      <span class="trade-arrow">⇄</span>
+      <div>${cardsPreview(mineSide)}<small>you give ${sum(mineSide)}</small></div>
+    </div>
+    <div class="trade-row-actions">${dir === 'in'
+      ? `<button class="btn btn-mint btn-sm" data-trade-accept="${t.id}">Accept</button>
+         <button class="btn btn-quiet btn-sm" data-trade-decline="${t.id}">Decline</button>`
+      : `<button class="btn btn-quiet btn-sm" data-trade-decline="${t.id}">Cancel offer</button>`}</div>
+  </div>`;
+}
+
+function renderTradesList() {
+  const inc = incomingTrades.map(t => tradeRowHTML(t, 'in')).join('');
+  const out = outgoingTrades.map(t => tradeRowHTML(t, 'out')).join('');
+  $('#tradesList').innerHTML =
+    `<h4 class="side-title">Incoming (${incomingTrades.length})</h4>${inc || '<div class="act-empty">No incoming offers</div>'}
+     <h4 class="side-title" style="margin-top:14px">Sent (${outgoingTrades.length})</h4>${out || '<div class="act-empty">No open offers</div>'}`;
+}
+
+$('#tradesBell').addEventListener('click', () => { renderTradesList(); $('#tradesScrim').classList.add('open'); });
+
+document.addEventListener('click', async e => {
+  const acc = e.target.closest('[data-trade-accept]');
+  const dec = e.target.closest('[data-trade-decline]');
+  if (dec) {
+    try { await updateDoc(doc(db, 'trades', dec.dataset.tradeDecline), { status: 'closed' }); toast('Offer closed'); } catch {}
+    return;
+  }
+  if (!acc) return;
+  const id = acc.dataset.tradeAccept;
+  acc.disabled = true;
+  try {
+    await runTransaction(db, async tx => {
+      const tRef = doc(db, 'trades', id);
+      const tSnap = await tx.get(tRef);
+      if (!tSnap.exists() || tSnap.data().status !== 'pending') throw new Error('gone');
+      const t = tSnap.data();
+      const aRef = doc(db, 'users', t.fromUid), bRef = doc(db, 'users', t.toUid);
+      const a = (await tx.get(aRef)).data(), b = (await tx.get(bRef)).data();
+      const has = (coll, cards) => cards.every(c => (coll || []).some(x => x.id === c.id));
+      if (!has(a.collection, t.give.cards) || !has(b.collection, t.get.cards)) throw new Error('items moved');
+      if ((a.balance || 0) < t.give.cash || (b.balance || 0) < t.get.cash) throw new Error('cash short');
+      const giveIds = new Set(t.give.cards.map(c => c.id));
+      const getIds = new Set(t.get.cards.map(c => c.id));
+      const newA = (a.collection || []).filter(c => !giveIds.has(c.id)).concat(t.get.cards);
+      const newB = (b.collection || []).filter(c => !getIds.has(c.id)).concat(t.give.cards);
+      tx.update(aRef, { collection: newA, balance: round2((a.balance || 0) - t.give.cash + t.get.cash), updatedAt: Date.now() });
+      tx.update(bRef, { collection: newB, balance: round2((b.balance || 0) - t.get.cash + t.give.cash), updatedAt: Date.now() });
+      tx.update(tRef, { status: 'accepted' });
+    });
+    Sfx.reveal('legendary');
+    toast('Trade complete! Check your collection');
+  } catch (err) {
+    toast(err.message === 'items moved' ? 'Trade failed — cards were already traded or sold' : 'Trade failed — try again');
+  }
+});
+
+/* ---------- market snapshot (real listings merge with bots) ---------- */
+
+function watchMarket() {
+  onSnapshot(query(fsCollection(db, 'market'), orderBy('createdAt', 'desc'), limit(40)), snap => {
+    const cloud = snap.docs.map(d => {
+      const x = d.data();
+      return { id: 'fs_' + d.id, docId: d.id, creature: x.creature, price: x.price,
+               seller: x.sellerName, sellerUid: x.sellerUid };
+    });
+    S.market = cloud.concat(S.market.filter(l => l.bot));
+    renderMarket(); renderFeatured(); renderWalletPage();
+  });
+}
+
+/* ---------- own doc sync (trades change it remotely) ---------- */
+
+function watchMyDoc() {
+  onSnapshot(doc(db, 'users', FBUser.uid), snap => {
+    if (!snap.exists()) return;
+    const d = snap.data();
+    const changed = d.balance !== S.balance || JSON.stringify(d.collection) !== JSON.stringify(S.collection);
+    if (!changed) return;
+    applyingRemote = true;
+    S.balance = d.balance ?? S.balance;
+    S.collection = d.collection ?? S.collection;
+    Store.save(S);
+    applyingRemote = false;
+    renderAll();
+  });
+}
+
+/* ---------- auth screen ---------- */
+
+let authMode = 'signin';
+
+function setAuthMode(mode) {
+  authMode = mode;
+  $$('.auth-tab').forEach(b => b.classList.toggle('active', b.dataset.mode === mode));
+  const pill = $('#authTabPill'), active = $('.auth-tab.active');
+  pill.style.width = active.offsetWidth + 'px';
+  pill.style.transform = `translateX(${active.offsetLeft - 4}px)`;
+  $('#authName').hidden = mode !== 'signup';
+  $('#authTitle').textContent = mode === 'signin' ? 'Welcome back' : 'Join MINT';
+  $('#authSub').textContent = mode === 'signin' ? 'Sign in to your collection.' : 'Start collecting in seconds.';
+  $('#authSubmitText').textContent = mode === 'signin' ? 'Sign in' : 'Create account';
+  authError('');
+}
+$$('.auth-tab').forEach(b => b.addEventListener('click', () => setAuthMode(b.dataset.mode)));
+
+function authError(msg) {
+  const el = $('#authError');
+  el.hidden = !msg;
+  el.textContent = msg;
+  if (msg) {
+    $('#authCard').classList.remove('shake-x');
+    void $('#authCard').offsetWidth;
+    $('#authCard').classList.add('shake-x');
+  }
+}
+
+function authBusy(on) {
+  $('#authSubmit').disabled = on;
+  $('#authGoogle').disabled = on;
+  $('#authSpin').hidden = !on;
+}
+
+const authErrMsg = e => ({
+  'auth/invalid-credential': 'Wrong email or password',
+  'auth/invalid-email': 'That email doesn\u2019t look right',
+  'auth/email-already-in-use': 'That email already has an account — try signing in',
+  'auth/weak-password': 'Password needs at least 6 characters',
+  'auth/popup-closed-by-user': '',
+}[e.code] ?? 'Something went wrong — try again');
+
+$('#authSubmit').addEventListener('click', async () => {
+  const email = $('#authEmail').value.trim();
+  const pass = $('#authPass').value;
+  const name = $('#authName').value.trim();
+  if (!email || !pass) return authError('Fill in your email and password');
+  if (authMode === 'signup' && name.length < 3) return authError('Pick a username (3+ characters)');
+  authBusy(true);
+  try {
+    if (authMode === 'signup') {
+      const cred = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(cred.user, { displayName: name });
+    } else {
+      await signInWithEmailAndPassword(auth, email, pass);
+    }
+  } catch (e) { authError(authErrMsg(e)); }
+  authBusy(false);
+});
+$('#authPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('#authSubmit').click(); });
+
+$('#authGoogle').addEventListener('click', async () => {
+  authBusy(true);
+  try { await signInWithPopup(auth, new GoogleAuthProvider()); }
+  catch (e) { const m = authErrMsg(e); if (m) authError(m); }
+  authBusy(false);
+});
+
+function paintAuthCritters() {
+  const el = $('#authCritters');
+  el.innerHTML = SPECIES.slice(0, 8).map((sp, i) =>
+    `<span class="float-critter" style="--fx:${(i * 12.5 + 4)}%;--fd:${(i % 4) * 1.1}s;--ft:${9 + (i % 3) * 3}s">
+      ${svgFor({ species: sp.id, seed: 2222 + i * 31, rarity: 'common', name: sp.label })}</span>`).join('');
+}
+
+/* ---------- lifecycle ---------- */
+
+let uiBooted = false;
+
+function bootUI() {
+  if (uiBooted) return;
+  uiBooted = true;
+  $('#speciesFilter').insertAdjacentHTML('beforeend',
+    SPECIES.map(sp => `<option value="${sp.id}">${sp.label}</option>`).join(''));
+  $('#packArtStandard').innerHTML = packSVG('standard');
+  $('#packArtPremium').innerHTML = packSVG('premium');
+  renderOdds();
+  renderHero();
+}
+
+async function ensureUserDoc(user) {
+  const uRef = doc(db, 'users', user.uid);
+  const snap = await getDoc(uRef);
+  if (snap.exists()) return snap.data();
+  const username = (user.displayName || user.email.split('@')[0]).slice(0, 20);
+  const fresh = { username, usernameLower: username.toLowerCase(), balance: 0, collection: [],
+                  accountValue: 0, createdAt: Date.now(), updatedAt: Date.now() };
+  await setDoc(uRef, fresh);
+  return fresh;
+}
+
+onAuthStateChanged(auth, async user => {
+  FBUser = user;
+  if (!user) {
+    Me = null;
+    $('#authScreen').classList.remove('leaving');
+    $('#authScreen').style.display = '';
+    paintAuthCritters();
+    setAuthMode('signin');
+    return;
+  }
+  try {
+    const data = await ensureUserDoc(user);
+    Me = { uid: user.uid, username: data.username, createdAt: data.createdAt };
+    Store.KEY = 'mint_v8_' + user.uid;
+    const local = Store.load();
+    if (local) { S.economy = local.economy || S.economy; S.activity = local.activity || []; S.mints = local.mints || {}; }
+    for (const k of Object.keys(RARITIES)) { if (S.economy.r[k] == null) S.economy.r[k] = 1; if (S.economy.drift[k] == null) S.economy.drift[k] = 0; }
+    applyingRemote = true;
+    S.balance = data.balance || 0;
+    S.collection = data.collection || [];
+    applyingRemote = false;
+    S.market = S.market.filter(l => l.bot);
+    bootUI();
+    seedMarket();
+    renderHeaderAccount();
+    renderAll();
+    watchMarket();
+    watchMyDoc();
+    watchTrades();
+    loadRanks();
+    const scr = $('#authScreen');
+    scr.classList.add('leaving');
+    setTimeout(() => { scr.style.display = 'none'; }, 650);
+  } catch (e) {
+    console.error(e);
+    toast('Could not load your account — check your connection');
+  }
+});
+
+/* ranks tab lazy refresh + profile view action */
+document.addEventListener('click', e => {
+  const t = e.target.closest('[data-tab="ranks"]');
+  if (t) loadRanks();
+  const v = e.target.closest('[data-act="viewpf"]');
+  if (v && viewingProfile) {
+    const c = (viewingProfile.collection || []).find(x => x.id === v.dataset.id);
+    if (c) {
+      // temporarily view a card that may not be ours
+      const orig = S.collection;
+      if (!orig.some(x => x.id === c.id)) S.collection = orig.concat(c);
+      openDetail(c.id);
+      S.collection = orig;
+    }
+  }
+});

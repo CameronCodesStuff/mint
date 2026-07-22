@@ -169,3 +169,38 @@ at ~76vw, does its rarity charge-glow, flips with full-size type (22px name,
 readable epithet), holds for a rarity-scaled beat, then shrinks away into a
 horizontal tray of opened cards above the action bar. The desktop grid flow is
 unchanged. Tap the spotlight to fast-forward.
+
+## v8 — accounts, trading & leaderboards (Firebase)
+
+**What's new**
+- Animated auth screen: frosted glass card over floating critters, Sign in /
+  Create account tabs with a sliding pill, inline validation with shake-on-error,
+  loading states, Google one-tap and email/password (Firebase Auth).
+- Accounts: user docs in Firestore (`users/{uid}`) hold username, balance,
+  collection and a computed accountValue; local play state syncs up (debounced)
+  and down (live snapshot — trades update you in real time).
+- Profiles: gradient banner keyed to the username, big avatar with upload
+  (client-resized to 96px JPEG, stored as base64 in RTDB `avatars/{uid}`),
+  collector-since date, stat tiles, and a showcase of their 6 best cards.
+  Tap any player on a leaderboard to visit their profile.
+- Trading: "Propose trade" from any profile — pick cards from both collections,
+  add cash on either side, live value summary, send. Incoming offers hit the
+  bell badge instantly; accepting runs a Firestore transaction that verifies
+  both sides still own everything, swaps cards, and settles the cash.
+- Leaderboards: Richest cash and Richest accounts (cash + live collection
+  value), top 10 with medals, avatars and staggered entrance animations.
+- The market is now real: your listings are Firestore docs other players can
+  buy (seller gets credited in a transaction); bot listings still fill the
+  gaps and follow the live economy.
+
+**Firebase console setup (one-time)**
+1. Authentication → Sign-in method → enable **Email/Password** and **Google**.
+2. Firestore → create database → rules for the prototype:
+   `allow read, write: if request.auth != null;`
+3. Realtime Database → create → rules: `{ "rules": { "avatars": { ".read": true, "$uid": { ".write": "auth.uid === $uid" } } } }`
+4. Add your GitHub Pages domain under Authentication → Authorized domains.
+
+**Security reality check**: everything runs client-side, so a motivated user
+can edit their own balance. Fine for a prototype among friends; before real
+money, route balance changes through a Cloudflare Worker with the Admin SDK
+and lock Firestore rules down to read-only for money fields.
