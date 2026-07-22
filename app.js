@@ -891,6 +891,7 @@ async function runFlipSequence() {
     const card = cards[i];
     const c = pendingPack[i];
     card.classList.add('charging');            // rarity pre-glow: the "something's coming" beat
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     if (!['common', 'rare'].includes(c.rarity)) card.classList.add('big-charge');
     await sleep(CHARGE_MS[c.rarity]);
     card.classList.remove('charging', 'big-charge');

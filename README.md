@@ -150,3 +150,14 @@ block at the top of `app.js`.
   sprig emblem seal, wordmark, card count. Standard = pastel foil wrapper;
   Premium = midnight wrapper with rainbow foil bands and gold crimps. Same art
   is what bursts open in the reveal.
+
+## v7.2 — mobile reveal overhaul
+
+- The pack reveal is now a full-height app screen on phones: sticky Pack Value
+  header, a scrollable 2-up card grid in the middle, and a frosted action bar
+  pinned to the bottom (with safe-area padding) so "Add to collection" and
+  "Open another" are always reachable. Each card auto-scrolls into view as it
+  charges, so flips never happen off-screen.
+- Typography unjammed: epithets clamp to two tidy lines everywhere, card faces
+  got rebalanced padding/sizes on small screens, footers wrap instead of
+  colliding, and the detail modal scrolls within 90dvh.
