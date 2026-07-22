@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MINT — Own the unreal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark"></span>
+    <h1>MINT</h1>
+  </div>
+  <div class="wallet">
+    <div class="balance-chip">
+      <span class="bal-label">Balance</span>
+      <span class="bal-amt" id="balance">$0.00</span>
+    </div>
+    <button class="btn btn-dark btn-sm" id="depositBtn">Add funds</button>
+    <button class="btn btn-quiet btn-sm" id="withdrawBtn">Withdraw</button>
+  </div>
+</header>
+
+<nav class="seg-wrap">
+  <div class="seg" id="seg">
+    <span class="seg-pill" id="segPill"></span>
+    <button class="seg-btn active" data-tab="shop">Shop</button>
+    <button class="seg-btn" data-tab="collection">Collection</button>
+    <button class="seg-btn" data-tab="market">Market</button>
+    <button class="seg-btn" data-tab="activity">Activity</button>
+  </div>
+</nav>
+
+<main>
+  <!-- SHOP -->
+  <section class="panel active" id="tab-shop">
+    <div class="hero">
+      <p class="eyebrow">Limited procedural mints</p>
+      <h2>Own the unreal.</h2>
+      <p class="sub">Every specimen is minted once, serialised, and never reprinted. 500 per species. That's it.</p>
+    </div>
+    <div class="packs-row">
+      <article class="pack-card">
+        <div class="pack-visual pack-standard" aria-hidden="true"><div class="pack-gem"></div></div>
+        <div class="pack-info">
+          <h3>Standard Pack</h3>
+          <p>3 specimens · standard odds</p>
+          <button class="btn btn-pay" data-pack="standard"><span class="pay-mark"></span>Pay&nbsp;&nbsp;$4.99</button>
+        </div>
+      </article>
+      <article class="pack-card">
+        <div class="pack-visual pack-premium" aria-hidden="true"><div class="pack-gem"></div></div>
+        <div class="pack-info">
+          <h3>Premium Pack</h3>
+          <p>5 specimens · 3× Legendary odds</p>
+          <button class="btn btn-pay" data-pack="premium"><span class="pay-mark"></span>Pay&nbsp;&nbsp;$9.99</button>
+        </div>
+      </article>
+    </div>
+    <div class="odds-box">
+      <h4>Mint odds</h4>
+      <div class="odds" id="oddsTable"></div>
+      <p class="fine">Prices in NZD. All sales are final. Serial numbers are assigned at mint and can never be re-issued.</p>
+    </div>
+  </section>
+
+  <!-- COLLECTION -->
+  <section class="panel" id="tab-collection">
+    <div class="panel-head">
+      <h2>Collection <span class="count" id="collCount">0</span></h2>
+      <select id="sortSel" aria-label="Sort collection">
+        <option value="new">Newest</option>
+        <option value="rarity">Rarity</option>
+        <option value="power">Power</option>
+      </select>
+    </div>
+    <div class="grid" id="collectionGrid"></div>
+    <div class="empty" id="collectionEmpty">
+      <p>Nothing here yet.</p>
+      <button class="btn btn-dark" data-goto="shop">Browse packs</button>
+    </div>
+  </section>
+
+  <!-- MARKET -->
+  <section class="panel" id="tab-market">
+    <div class="panel-head">
+      <h2>Market</h2>
+      <div class="market-stats" id="marketStats"></div>
+    </div>
+    <div class="grid" id="marketGrid"></div>
+  </section>
+
+  <!-- ACTIVITY -->
+  <section class="panel" id="tab-activity">
+    <div class="panel-head"><h2>Activity</h2></div>
+    <div class="activity" id="activityList"></div>
+  </section>
+</main>
+
+<!-- Payment sheet -->
+<div class="scrim" id="payScrim">
+  <div class="pay-sheet" role="dialog" aria-modal="true" aria-label="Payment">
+    <div class="sheet-grab"></div>
+    <div class="pay-head">
+      <span class="pay-logo"> Pay</span>
+      <button class="close-x" id="payCancel" aria-label="Cancel">✕</button>
+    </div>
+    <div class="pay-body" id="payBody"></div>
+    <div class="pay-method">
+      <div class="card-chip" id="payMethodChip"></div>
+      <div class="pay-method-text">
+        <strong id="payMethodName">MINT Card</strong>
+        <span id="payMethodSub">Visa ···· 4242</span>
+      </div>
+      <span class="chev">›</span>
+    </div>
+    <button class="btn btn-paynow" id="payConfirm"></button>
+    <div class="pay-processing" id="payProcessing">
+      <div class="spinner" id="paySpinner"></div>
+      <svg class="checkmark" id="payCheck" viewBox="0 0 52 52"><circle cx="26" cy="26" r="24" fill="none"/><path fill="none" d="M14 27l8 8 16-16"/></svg>
+      <p id="payStatus">Processing</p>
+    </div>
+  </div>
+</div>
+
+<!-- Deposit sheet -->
+<div class="scrim" id="depositScrim">
+  <div class="pay-sheet" role="dialog" aria-modal="true" aria-label="Add funds">
+    <div class="sheet-grab"></div>
+    <div class="pay-head">
+      <span class="pay-logo">Add funds</span>
+      <button class="close-x" data-close="depositScrim" aria-label="Cancel">✕</button>
+    </div>
+    <div class="amount-chips" id="amountChips">
+      <button class="chip" data-amt="10">$10</button>
+      <button class="chip active" data-amt="25">$25</button>
+      <button class="chip" data-amt="50">$50</button>
+      <button class="chip" data-amt="100">$100</button>
+    </div>
+    <div class="custom-amt">
+      <span>$</span>
+      <input type="number" id="customAmt" min="1" max="500" step="1" value="25" inputmode="decimal" aria-label="Amount in NZD">
+      <small>NZD</small>
+    </div>
+    <p class="sheet-note">Funds are added to your MINT balance and used automatically at checkout.</p>
+    <button class="btn btn-paynow" id="depositContinue">Continue</button>
+  </div>
+</div>
+
+<!-- Sell sheet -->
+<div class="scrim" id="sellScrim">
+  <div class="pay-sheet" role="dialog" aria-modal="true" aria-label="List for sale">
+    <div class="sheet-grab"></div>
+    <div class="pay-head">
+      <span class="pay-logo">List for sale</span>
+      <button class="close-x" data-close="sellScrim" aria-label="Cancel">✕</button>
+    </div>
+    <div class="sell-preview" id="sellPreview"></div>
+    <div class="sell-guide" id="sellGuide"></div>
+    <div class="price-stepper">
+      <button class="step-btn" id="stepDown" aria-label="Lower price">−</button>
+      <div class="custom-amt price-input">
+        <span>$</span>
+        <input type="number" id="sellPrice" min="0.5" step="0.5" inputmode="decimal" aria-label="Listing price in NZD">
+      </div>
+      <button class="step-btn" id="stepUp" aria-label="Raise price">+</button>
+    </div>
+    <div class="sell-badge" id="sellBadge"></div>
+    <button class="btn btn-paynow" id="sellConfirm">List it</button>
+  </div>
+</div>
+
+<!-- Pack opening -->
+<div class="scrim dark" id="revealScrim">
+  <div class="open-stage">
+    <div class="open-intro" id="openIntro">
+      <div class="open-gem-wrap" id="openGemWrap">
+        <div class="open-gem" id="openGem"></div>
+        <div class="gem-burst" id="gemBurst"></div>
+      </div>
+      <p class="open-hint">Tap to open</p>
+    </div>
+    <div class="reveal-stage" id="revealStage">
+      <div class="reveal-row" id="revealRow"></div>
+      <div class="reveal-actions">
+        <button class="btn btn-quiet" id="revealAll">Reveal all</button>
+        <button class="btn btn-light" id="revealDone">Add to collection</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="scrim" id="detailScrim">
+  <div class="detail-card" id="detailCard"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
