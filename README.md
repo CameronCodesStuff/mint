@@ -127,7 +127,7 @@ block at the top of `app.js`.
   black-and-gold reveal sequence, and a toast announcing the 1/1. Odds under 1%
   display as "1 in N" in the odds table. Bots never list either tier — packs are
   the only source.
-- **Favicon**: kawaii bunny + sprout on a pastel gradient tile (favicon.svg,
+- **Favicon**: the MINT sprig — green two-leaf sprout in a white emblem circle on the pastel gradient tile (matches the header logo and pack seal).
   favicon-32.png, apple-touch-icon.png).
 
 ## v7 — auto-open hype & branding

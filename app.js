@@ -809,6 +809,14 @@ const sleep = ms => new Promise(res => setTimeout(res, ms * speedMult));
 
 const CHARGE_MS = { common: 420, rare: 620, epic: 1000, legendary: 1500, mythic: 2100, celestial: 2400, eternal: 3000 };
 
+function confettiHTML() {
+  return `<span class="confetti">${Array.from({ length: 16 }, () => {
+    const a = Math.random() * Math.PI * 2;
+    const d = 70 + Math.random() * 90;
+    return `<i style="--c:${pick(BURST_COLORS)};--dx:${(Math.cos(a) * d).toFixed(0)}px;--dy:${(Math.sin(a) * d).toFixed(0)}px"></i>`;
+  }).join('')}</span>`;
+}
+
 function buyPack(key) {
   const pack = PACKS[key];
   PaySheet.open(
