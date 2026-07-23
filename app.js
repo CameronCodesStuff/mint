@@ -946,6 +946,7 @@ async function runOpenSequence(packKey) {
 
   const wrap = $('#openPackWrap');
   wrap.classList.remove('bursting');
+  wrap.dataset.pack = packKey;
   $('#openPackArt').innerHTML = packSVG(packKey);
   $('#openHint').textContent = 'Opening…';
   $('#gemBurst').innerHTML = Array.from({ length: 22 }, () => {
@@ -1938,8 +1939,11 @@ function bootUI() {
   uiBooted = true;
   $('#speciesFilter').insertAdjacentHTML('beforeend',
     SPECIES.map(sp => `<option value="${sp.id}">${sp.label}</option>`).join(''));
-  $('#packArtStandard').innerHTML = packSVG('standard');
-  $('#packArtPremium').innerHTML = packSVG('premium');
+  for (const k of Object.keys(PACKS)) {
+    const id = 'packArt' + k[0].toUpperCase() + k.slice(1);
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = packSVG(k);
+  }
   renderOdds();
   renderHero();
 }

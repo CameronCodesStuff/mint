@@ -1422,3 +1422,18 @@ input[type="search"]{width:190px}
 @media (max-width:760px){
   .mega-flip .value-tag{font-size:16px !important}
 }
+
+/* ============ v11.2: opening pack visibility on dark scrim ============ */
+
+/* pack art in the opening stage: bright glow behind dark packs */
+.open-pack-wrap .pack-svg{
+  filter:drop-shadow(0 0 30px rgba(255,255,255,.45)) drop-shadow(0 16px 40px rgba(0,0,0,.5));
+}
+
+/* pack-specific glow colors during opening */
+.open-pack-wrap[data-pack="ultra"] .pack-svg{
+  filter:drop-shadow(0 0 30px rgba(180,139,232,.7)) drop-shadow(0 0 60px rgba(180,139,232,.35)) drop-shadow(0 16px 40px rgba(0,0,0,.5));
+}
+.open-pack-wrap[data-pack="mega"] .pack-svg{
+  filter:drop-shadow(0 0 30px rgba(242,121,159,.7)) drop-shadow(0 0 60px rgba(242,121,159,.35)) drop-shadow(0 16px 40px rgba(0,0,0,.5));
+}
