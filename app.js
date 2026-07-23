@@ -477,8 +477,8 @@ function packSVG(kind) {
   const crimp = premium ? '#c9a227' : '#8fd7b0';
   const emblemBg = premium ? '#2e2745' : '#ffffff';
   const label = premium ? '#f4d58d' : '#3aa572';
-  if (kind === 'ultra') return packSVGTier(kind, 'url(#pkUltra)', '#b48be8', '#1a1428', '#e0c6f7', 12);
-  if (kind === 'mega')  return packSVGTier(kind, 'url(#pkMega)',  '#f2799f', '#1c0f18', '#fcd9e6', 25);
+  if (kind === 'ultra') return packSVGTier(kind, null, '#b48be8', '#1a1428', '#e0c6f7', 12);
+  if (kind === 'mega')  return packSVGTier(kind, null, '#f2799f', '#1c0f18', '#fcd9e6', 25);
   const foil = premium
     ? `<path d="M14 34 L106 96 L106 116 L14 54 Z" fill="url(#pkRainbow)" opacity=".55"/>
        <path d="M14 60 L106 122 L106 132 L14 70 Z" fill="url(#pkRainbow)" opacity=".3"/>`
@@ -519,33 +519,35 @@ function packSVG(kind) {
   </svg>`;
 }
 
-function packSVGTier(kind, bodyGrad, accent, emblemBg, textCol, count) {
+function packSVGTier(kind, bodyGradDef, accent, emblemBg, textCol, count) {
   const zig = (y, flip) => {
     let d = `M14 ${y}`;
     for (let x = 14; x < 106; x += 8) d += ` L${x + 4} ${y + (flip ? 6 : -6)} L${x + 8} ${y}`;
     return d;
   };
+  const gid = 'pk_' + kind;
+  const rid = 'pkR_' + kind;
   const title = kind === 'ultra' ? 'ULTRA' : 'MEGA';
+  const gradColor = kind === 'mega'
+    ? ['#2c0a1a','#1c0f18','#2c1020']
+    : ['#2e1f46','#1c1530','#2a1840'];
   const foils = kind === 'mega'
-    ? `<path d="M14 30 L106 90 L106 106 L14 46 Z" fill="url(#pkRainbow)" opacity=".6"/>
-       <path d="M14 52 L106 112 L106 122 L14 62 Z" fill="url(#pkRainbow)" opacity=".35"/>
-       <path d="M14 74 L106 134 L106 142 L14 82 Z" fill="url(#pkRainbow)" opacity=".2"/>`
-    : `<path d="M14 34 L106 94 L106 110 L14 50 Z" fill="url(#pkRainbow)" opacity=".55"/>
-       <path d="M14 58 L106 118 L106 128 L14 68 Z" fill="url(#pkRainbow)" opacity=".3"/>`;
+    ? `<path d="M14 30 L106 90 L106 106 L14 46 Z" fill="url(#${rid})" opacity=".6"/>
+       <path d="M14 52 L106 112 L106 122 L14 62 Z" fill="url(#${rid})" opacity=".35"/>
+       <path d="M14 74 L106 134 L106 142 L14 82 Z" fill="url(#${rid})" opacity=".2"/>`
+    : `<path d="M14 34 L106 94 L106 110 L14 50 Z" fill="url(#${rid})" opacity=".55"/>
+       <path d="M14 58 L106 118 L106 128 L14 68 Z" fill="url(#${rid})" opacity=".3"/>`;
   return `<svg viewBox="0 0 120 168" xmlns="http://www.w3.org/2000/svg" class="pack-svg" aria-hidden="true">
     <defs>
-      <linearGradient id="pkUltra" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#2e1f46"/><stop offset=".5" stop-color="#1c1530"/><stop offset="1" stop-color="#2a1840"/>
+      <linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="${gradColor[0]}"/><stop offset=".5" stop-color="${gradColor[1]}"/><stop offset="1" stop-color="${gradColor[2]}"/>
       </linearGradient>
-      <linearGradient id="pkMega" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#2c0a1a"/><stop offset=".5" stop-color="#1c0f18"/><stop offset="1" stop-color="#2c1020"/>
-      </linearGradient>
-      <linearGradient id="pkRainbow" x1="0" y1="0" x2="1" y2="0">
+      <linearGradient id="${rid}" x1="0" y1="0" x2="1" y2="0">
         <stop offset="0" stop-color="#7cb8f7"/><stop offset=".33" stop-color="#b48be8"/><stop offset=".66" stop-color="#f2799f"/><stop offset="1" stop-color="#e5b345"/>
       </linearGradient>
     </defs>
     <path d="${zig(14, true)} L106 14 L106 8 L14 8 Z" fill="${accent}"/>
-    <rect x="14" y="14" width="92" height="132" rx="8" fill="${bodyGrad}"/>
+    <rect x="14" y="14" width="92" height="132" rx="8" fill="url(#${gid})"/>
     ${foils}
     <path d="${zig(152, false)} L106 152 L106 158 L14 158 Z" fill="${accent}"/>
     <rect x="14" y="146" width="92" height="6" fill="${accent}"/>
@@ -903,7 +905,7 @@ let lastPackKey = null;
 let speedMult = 1;
 const sleep = ms => new Promise(res => setTimeout(res, ms * speedMult));
 
-const CHARGE_MS = { common: 380, rare: 550, epic: 900, legendary: 2200, mythic: 3200, celestial: 4000, eternal: 5500 };
+const CHARGE_MS = { common: 180, rare: 280, epic: 650, legendary: 2200, mythic: 3200, celestial: 4000, eternal: 5500 };
 
 function confettiHTML() {
   return `<span class="confetti">${Array.from({ length: 16 }, () => {
@@ -977,7 +979,7 @@ function revealCardHTML(c, i, extraStyle = '') {
   </div>`;
 }
 
-const HOLD_MS = { common: 600, rare: 750, epic: 1100, legendary: 2000, mythic: 2800, celestial: 3400, eternal: 4500 };
+const HOLD_MS = { common: 350, rare: 450, epic: 800, legendary: 2000, mythic: 2800, celestial: 3400, eternal: 4500 };
 
 async function runMobileSpotlight() {
   $('#openIntro').style.display = 'none';
@@ -1053,7 +1055,8 @@ async function runFlipSequence() {
     flipCard(card, c);
     total = round2(total + fairValue(c));
     animateValue(total);
-    await sleep(520);
+    const flipGap = ['common','rare'].includes(c.rarity) ? 280 : 520;
+    await sleep(flipGap);
   }
   finishReveal(total);
 }
@@ -1474,23 +1477,30 @@ async function autoListCards(cards) {
   const rarities = new Set(Settings.autoListRarities);
   if (!rarities.size || !FBUser) return;
   const markup = Settings.markup / 100;
-  const toList = cards.filter(c => rarities.has(c.rarity));
-  for (const c of toList) {
-    const price = round2(fairValue(c) * markup);
-    const idx = S.collection.findIndex(x => x.id === c.id);
-    if (idx === -1) continue;
-    S.collection.splice(idx, 1);
-    try {
-      await addDoc(fsCollection(db, 'market'), {
-        creature: c, price, sellerUid: FBUser.uid, sellerName: Me.username, createdAt: Date.now(),
-      });
-      log('\u25a4', 'Auto-listed ' + c.name, money(price), 0);
-    } catch {
-      S.collection.push(c);
-    }
+  const toList = cards.filter(c => rarities.has(c.rarity) && S.collection.some(x => x.id === c.id));
+  if (!toList.length) return;
+  // remove all from collection first
+  const ids = new Set(toList.map(c => c.id));
+  S.collection = S.collection.filter(c => !ids.has(c.id));
+  // fire all writes in parallel batches of 10
+  const now = Date.now();
+  let listed = 0;
+  for (let i = 0; i < toList.length; i += 10) {
+    const batch = toList.slice(i, i + 10);
+    const results = await Promise.allSettled(batch.map(c =>
+      addDoc(fsCollection(db, 'market'), {
+        creature: c, price: round2(fairValue(c) * markup),
+        sellerUid: FBUser.uid, sellerName: Me.username, createdAt: now + i,
+      })
+    ));
+    results.forEach((r, j) => {
+      if (r.status === 'fulfilled') { listed++; }
+      else { S.collection.push(batch[j]); } // put failed ones back
+    });
   }
-  if (toList.length) {
-    toast('Auto-listed ' + toList.length + ' card' + (toList.length > 1 ? 's' : '') + ' on the market');
+  if (listed) {
+    log('\u25a4', 'Auto-listed ' + listed + ' cards', money(round2(toList.reduce((s,c) => s + fairValue(c) * markup, 0))), 0);
+    toast('Auto-listed ' + listed + ' card' + (listed > 1 ? 's' : '') + ' on the market');
     renderAll();
   }
 }
