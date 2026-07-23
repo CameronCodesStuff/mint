@@ -64,6 +64,10 @@ const PACKS = {
               odds: { common: 86, rare: 11.489, epic: 2, legendary: 0.4, mythic: 0.1, celestial: 0.01, eternal: 0.001 } },
   premium:  { name: 'Premium Pack',  price: 9.99, cards: 5,
               odds: { common: 70, rare: 21.456, epic: 6.5, legendary: 1.6, mythic: 0.4, celestial: 0.04, eternal: 0.004 } },
+  ultra:    { name: 'Ultra Pack',    price: 49.99, cards: 12,
+              odds: { common: 52, rare: 28, epic: 14, legendary: 4.2, mythic: 1.4, celestial: 0.35, eternal: 0.05 } },
+  mega:     { name: 'Mega Pack',     price: 99.99, cards: 25,
+              odds: { common: 38, rare: 30, epic: 20, legendary: 8, mythic: 3, celestial: 0.85, eternal: 0.15 } },
 };
 
 const SPECIES = [
@@ -473,6 +477,8 @@ function packSVG(kind) {
   const crimp = premium ? '#c9a227' : '#8fd7b0';
   const emblemBg = premium ? '#2e2745' : '#ffffff';
   const label = premium ? '#f4d58d' : '#3aa572';
+  if (kind === 'ultra') return packSVGTier(kind, 'url(#pkUltra)', '#b48be8', '#1a1428', '#e0c6f7', 8);
+  if (kind === 'mega')  return packSVGTier(kind, 'url(#pkMega)',  '#f2799f', '#1c0f18', '#fcd9e6', 10);
   const foil = premium
     ? `<path d="M14 34 L106 96 L106 116 L14 54 Z" fill="url(#pkRainbow)" opacity=".55"/>
        <path d="M14 60 L106 122 L106 132 L14 70 Z" fill="url(#pkRainbow)" opacity=".3"/>`
@@ -510,6 +516,51 @@ function packSVG(kind) {
     </g>
     <text x="60" y="126" text-anchor="middle" font-family="'Baloo 2',sans-serif" font-weight="800" font-size="15" letter-spacing="4" fill="${label}">MINT</text>
     <text x="60" y="139" text-anchor="middle" font-family="'Baloo 2',sans-serif" font-weight="700" font-size="7" letter-spacing="2" fill="${label}" opacity=".75">${premium ? '5 CARDS' : '3 CARDS'}</text>
+  </svg>`;
+}
+
+function packSVGTier(kind, bodyGrad, accent, emblemBg, textCol, count) {
+  const zig = (y, flip) => {
+    let d = `M14 ${y}`;
+    for (let x = 14; x < 106; x += 8) d += ` L${x + 4} ${y + (flip ? 6 : -6)} L${x + 8} ${y}`;
+    return d;
+  };
+  const title = kind === 'ultra' ? 'ULTRA' : 'MEGA';
+  const foils = kind === 'mega'
+    ? `<path d="M14 30 L106 90 L106 106 L14 46 Z" fill="url(#pkRainbow)" opacity=".6"/>
+       <path d="M14 52 L106 112 L106 122 L14 62 Z" fill="url(#pkRainbow)" opacity=".35"/>
+       <path d="M14 74 L106 134 L106 142 L14 82 Z" fill="url(#pkRainbow)" opacity=".2"/>`
+    : `<path d="M14 34 L106 94 L106 110 L14 50 Z" fill="url(#pkRainbow)" opacity=".55"/>
+       <path d="M14 58 L106 118 L106 128 L14 68 Z" fill="url(#pkRainbow)" opacity=".3"/>`;
+  return `<svg viewBox="0 0 120 168" xmlns="http://www.w3.org/2000/svg" class="pack-svg" aria-hidden="true">
+    <defs>
+      <linearGradient id="pkUltra" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#2e1f46"/><stop offset=".5" stop-color="#1c1530"/><stop offset="1" stop-color="#2a1840"/>
+      </linearGradient>
+      <linearGradient id="pkMega" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#2c0a1a"/><stop offset=".5" stop-color="#1c0f18"/><stop offset="1" stop-color="#2c1020"/>
+      </linearGradient>
+      <linearGradient id="pkRainbow" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#7cb8f7"/><stop offset=".33" stop-color="#b48be8"/><stop offset=".66" stop-color="#f2799f"/><stop offset="1" stop-color="#e5b345"/>
+      </linearGradient>
+    </defs>
+    <path d="${zig(14, true)} L106 14 L106 8 L14 8 Z" fill="${accent}"/>
+    <rect x="14" y="14" width="92" height="132" rx="8" fill="${bodyGrad}"/>
+    ${foils}
+    <path d="${zig(152, false)} L106 152 L106 158 L14 158 Z" fill="${accent}"/>
+    <rect x="14" y="146" width="92" height="6" fill="${accent}"/>
+    <text x="92" y="34" font-size="13" fill="${accent}" opacity=".9">✦</text>
+    <text x="20" y="140" font-size="9" fill="${accent}" opacity=".8">✦</text>
+    <text x="17" y="32" font-size="7" fill="${accent}" opacity=".75">✦</text>
+    <circle cx="60" cy="76" r="25" fill="${emblemBg}" stroke="${accent}" stroke-width="2.5"/>
+    <g transform="translate(60,76) scale(1.7) translate(-12,-13)">
+      <path d="M12 22c0-5.5 0-8.5 0-10" fill="none" stroke="#3aa572" stroke-width="2" stroke-linecap="round"/>
+      <path d="M12 12C12 6.5 15.5 3.5 20 3.5 20 9 16.5 12 12 12Z" fill="#4cbf87"/>
+      <path d="M12 12C12 6.5 8.5 3.5 4 3.5 4 9 7.5 12 12 12Z" fill="#6fd6a3"/>
+    </g>
+    <text x="60" y="118" text-anchor="middle" font-family="'Baloo 2',sans-serif" font-weight="800" font-size="10" letter-spacing="5" fill="${textCol}">${title}</text>
+    <text x="60" y="126" text-anchor="middle" font-family="'Baloo 2',sans-serif" font-weight="800" font-size="14" letter-spacing="4" fill="${textCol}">MINT</text>
+    <text x="60" y="139" text-anchor="middle" font-family="'Baloo 2',sans-serif" font-weight="700" font-size="7" letter-spacing="2" fill="${textCol}" opacity=".75">${count} CARDS</text>
   </svg>`;
 }
 
@@ -1097,33 +1148,71 @@ function seedMarket() {
 function buyListing(lid) {
   const l = S.market.find(x => x.id === lid);
   if (!l || isMine(l)) return;
+  const isCloud = !!l.docId;
   PaySheet.open(
     [{ name: `${l.creature.name} · from @${l.seller}`, price: l.price }],
     l.price,
     async (usedBalance) => {
-      if (l.docId) {
-        // real listing: transact — remove listing, credit seller
+      if (isCloud) {
+        // Real player listing: Firestore transaction
+        // 1. Delete the listing doc
+        // 2. Credit the seller's balance
+        // 3. Add the card to buyer's collection
+        // 4. Remove the card from seller's collection
         try {
           await runTransaction(db, async tx => {
             const lRef = doc(db, 'market', l.docId);
-            const snap = await tx.get(lRef);
-            if (!snap.exists()) throw new Error('gone');
-            const sRef = doc(db, 'users', l.sellerUid);
-            const sSnap = await tx.get(sRef);
+            const lSnap = await tx.get(lRef);
+            if (!lSnap.exists()) throw new Error('gone');
+            const listingData = lSnap.data();
+
+            // credit seller
+            const sellerRef = doc(db, 'users', listingData.sellerUid);
+            const sellerSnap = await tx.get(sellerRef);
+
+            // update buyer (me)
+            const buyerRef = doc(db, 'users', FBUser.uid);
+            const buyerSnap = await tx.get(buyerRef);
+            if (!buyerSnap.exists()) throw new Error('account missing');
+
+            const buyerData = buyerSnap.data();
+            const newBuyerBal = round2((buyerData.balance || 0) - listingData.price);
+            if (newBuyerBal < -0.01) throw new Error('insufficient');
+            const newBuyerColl = [...(buyerData.collection || []), listingData.creature];
+
             tx.delete(lRef);
-            if (sSnap.exists()) tx.update(sRef, { balance: round2((sSnap.data().balance || 0) + l.price), updatedAt: Date.now() });
+            tx.update(buyerRef, {
+              collection: newBuyerColl,
+              balance: newBuyerBal,
+              updatedAt: Date.now()
+            });
+            if (sellerSnap.exists()) {
+              tx.update(sellerRef, {
+                balance: round2((sellerSnap.data().balance || 0) + listingData.price),
+                updatedAt: Date.now()
+              });
+            }
           });
-        } catch {
-          toast('Too slow — that card was already bought');
+        } catch (e) {
+          if (e.message === 'gone') toast('Too slow — that card was already bought');
+          else if (e.message === 'insufficient') toast('Not enough balance for this purchase');
+          else toast('Purchase failed — try again');
           return;
         }
+        // Local state will update via watchMyDoc snapshot — but also do it optimistically
+        S.market = S.market.filter(x => x.id !== l.id);
+        bumpDemand(l.creature, 0.03);
+        log('⇄', `Bought ${l.creature.name}`, `From @${l.seller}`, -l.price);
+        toast(`${l.creature.name} is yours!`);
+      } else {
+        // Bot listing: local only
+        S.market = S.market.filter(x => x.id !== l.id);
+        S.collection.push(l.creature);
+        bumpDemand(l.creature, 0.03);
+        log('⇄', `Bought ${l.creature.name}`, usedBalance ? 'MINT Balance' : `From @${l.seller}`, -l.price);
+        toast(`${l.creature.name} is yours!`);
+        seedMarket();
       }
-      S.market = S.market.filter(x => x.id !== l.id);
-      S.collection.push(l.creature);
-      bumpDemand(l.creature, 0.03);
-      log('⇄', `Bought ${l.creature.name}`, usedBalance ? 'MINT Balance' : `From @${l.seller}`, -l.price);
-      toast(`${l.creature.name} is yours`);
-      seedMarket();
       renderAll();
     }
   );
@@ -1478,8 +1567,8 @@ document.addEventListener('click', e => {
 $('#tradeSend').addEventListener('click', async () => {
   const giveCash = round2(parseFloat($('#tradeMyCash').value) || 0);
   const getCash = round2(parseFloat($('#tradeTheirCash').value) || 0);
-  if (!TradeDraft.giveIds.size && !TradeDraft.getIds.size && !giveCash && !getCash) return toast('Pick something to trade first');
-  if (giveCash > S.balance) return toast("You don't have that much cash");
+  if (giveCash > S.balance) return toast("You don't have enough cash for that");
+  if (!TradeDraft.giveIds.size && !TradeDraft.getIds.size && giveCash <= 0 && getCash <= 0) return toast('Add some cards or cash to trade');
   try {
     await addDoc(fsCollection(db, 'trades'), {
       fromUid: FBUser.uid, fromName: Me.username,
@@ -1550,29 +1639,55 @@ document.addEventListener('click', async e => {
   if (!acc) return;
   const id = acc.dataset.tradeAccept;
   acc.disabled = true;
+  acc.textContent = 'Processing…';
   try {
     await runTransaction(db, async tx => {
       const tRef = doc(db, 'trades', id);
       const tSnap = await tx.get(tRef);
       if (!tSnap.exists() || tSnap.data().status !== 'pending') throw new Error('gone');
       const t = tSnap.data();
-      const aRef = doc(db, 'users', t.fromUid), bRef = doc(db, 'users', t.toUid);
-      const a = (await tx.get(aRef)).data(), b = (await tx.get(bRef)).data();
+      // t.fromUid = sender (the one who proposed), t.toUid = me (the one accepting)
+      // t.give = what SENDER gives me, t.get = what SENDER wants from me
+      const senderRef = doc(db, 'users', t.fromUid);
+      const myRef = doc(db, 'users', t.toUid);
+      const senderData = (await tx.get(senderRef)).data();
+      const myData = (await tx.get(myRef)).data();
+      if (!senderData || !myData) throw new Error('gone');
+
       const has = (coll, cards) => cards.every(c => (coll || []).some(x => x.id === c.id));
-      if (!has(a.collection, t.give.cards) || !has(b.collection, t.get.cards)) throw new Error('items moved');
-      if ((a.balance || 0) < t.give.cash || (b.balance || 0) < t.get.cash) throw new Error('cash short');
+      // sender must still own what they offered
+      if (!has(senderData.collection, t.give.cards)) throw new Error('items moved');
+      // I must still own what they asked for
+      if (!has(myData.collection, t.get.cards)) throw new Error('items moved');
+      // cash checks
+      if ((senderData.balance || 0) < t.give.cash) throw new Error('cash short');
+      if ((myData.balance || 0) < t.get.cash) throw new Error('cash short');
+
       const giveIds = new Set(t.give.cards.map(c => c.id));
       const getIds = new Set(t.get.cards.map(c => c.id));
-      const newA = (a.collection || []).filter(c => !giveIds.has(c.id)).concat(t.get.cards);
-      const newB = (b.collection || []).filter(c => !getIds.has(c.id)).concat(t.give.cards);
-      tx.update(aRef, { collection: newA, balance: round2((a.balance || 0) - t.give.cash + t.get.cash), updatedAt: Date.now() });
-      tx.update(bRef, { collection: newB, balance: round2((b.balance || 0) - t.get.cash + t.give.cash), updatedAt: Date.now() });
+
+      // sender: remove give.cards, add get.cards, subtract give.cash, add get.cash
+      const newSender = (senderData.collection || []).filter(c => !giveIds.has(c.id)).concat(t.get.cards);
+      const senderBal = round2((senderData.balance || 0) - t.give.cash + t.get.cash);
+
+      // me: remove get.cards, add give.cards, subtract get.cash, add give.cash
+      const newMe = (myData.collection || []).filter(c => !getIds.has(c.id)).concat(t.give.cards);
+      const myBal = round2((myData.balance || 0) - t.get.cash + t.give.cash);
+
+      tx.update(senderRef, { collection: newSender, balance: senderBal, updatedAt: Date.now() });
+      tx.update(myRef,     { collection: newMe,     balance: myBal,     updatedAt: Date.now() });
       tx.update(tRef, { status: 'accepted' });
     });
     Sfx.reveal('legendary');
-    toast('Trade complete! Check your collection');
+    toast('Trade complete! Your collection has been updated');
+    renderTradesList();
   } catch (err) {
-    toast(err.message === 'items moved' ? 'Trade failed — cards were already traded or sold' : 'Trade failed — try again');
+    const msg = err.message === 'items moved' ? 'Trade failed — cards were already traded or sold'
+              : err.message === 'cash short' ? 'Trade failed — not enough cash on one side'
+              : 'Trade failed — try again';
+    toast(msg);
+    acc.disabled = false;
+    acc.textContent = 'Accept';
   }
 });
 
@@ -1596,8 +1711,6 @@ function watchMyDoc() {
   onSnapshot(doc(db, 'users', FBUser.uid), snap => {
     if (!snap.exists()) return;
     const d = snap.data();
-    const changed = d.balance !== S.balance || JSON.stringify(d.collection) !== JSON.stringify(S.collection);
-    if (!changed) return;
     applyingRemote = true;
     S.balance = d.balance ?? S.balance;
     S.collection = d.collection ?? S.collection;

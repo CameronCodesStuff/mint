@@ -1157,3 +1157,107 @@ input[type="search"]{width:190px}
   .account-chip{padding:4px;max-width:none}
   .wallet .bell{display:grid}
 }
+
+/* ============ v9: ultra/mega pack visuals ============ */
+.pack-ultra{background:linear-gradient(150deg,#2e1f46,#1c1530 55%,#2a1840)}
+.pack-mega{background:linear-gradient(150deg,#2c0a1a,#1c0f18 55%,#2c1020)}
+
+/* ============ v9: trading CSS fixes ============ */
+
+/* trade composer: proper sizing, scrollable columns, readable on mobile */
+.pay-sheet.wide{
+  width:min(100%,580px);max-height:90dvh;overflow-y:auto;
+  overscroll-behavior:contain;-webkit-overflow-scrolling:touch;
+}
+.trade-cols{display:grid;grid-template-columns:1fr 36px 1fr;gap:8px;align-items:start;margin-bottom:10px}
+.trade-col{min-width:0}
+.trade-col h4{
+  font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--ink-2);margin-bottom:8px;text-align:center;
+}
+.trade-arrow{
+  align-self:center;font-size:18px;color:var(--ink-3);text-align:center;
+  padding-top:26px;
+}
+.trade-pick{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(56px,1fr));
+  gap:6px;background:#fff;border-radius:14px;padding:10px;
+  box-shadow:var(--shadow-sm);max-height:200px;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;margin-bottom:8px;min-height:70px;
+}
+.pickcard{
+  width:100%;border:2px solid transparent;border-radius:10px;background:var(--pastel);
+  padding:4px 3px 5px;display:flex;flex-direction:column;align-items:center;gap:2px;
+  transition:border-color .12s,transform .12s,box-shadow .12s;
+}
+.pickcard svg{width:100%;max-width:44px;height:auto;aspect-ratio:1}
+.pickcard span{
+  font-size:7.5px;font-weight:700;color:var(--ink-2);width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center;
+}
+.pickcard.picked{
+  border-color:var(--green);transform:scale(1.04);
+  box-shadow:0 0 12px rgba(76,191,135,.4);background:color-mix(in srgb,var(--green) 8%,var(--pastel));
+}
+.pick-empty{
+  grid-column:1/-1;font-size:12px;color:var(--ink-3);
+  text-align:center;padding:14px 0;
+}
+.trade-summary{
+  text-align:center;font-size:13px;color:var(--ink-2);margin:6px 0 14px;
+  padding:8px 12px;background:rgba(80,60,90,.04);border-radius:10px;
+}
+.trade-summary b{color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* trade inbox */
+.trades-list{max-height:72vh;overflow-y:auto;-webkit-overflow-scrolling:touch;padding-bottom:10px}
+.trade-row{
+  background:#fff;border-radius:16px;padding:14px 16px;
+  box-shadow:var(--shadow-sm);margin-bottom:10px;
+}
+.trade-row-head{display:flex;justify-content:space-between;align-items:center;font-size:13.5px;margin-bottom:10px}
+.trade-row-head b{font-weight:700}
+.trade-row-head span{color:var(--ink-3);font-size:11px}
+.trade-row-body{
+  display:flex;align-items:center;gap:8px;
+  background:var(--canvas);border-radius:12px;padding:10px;
+}
+.trade-row-body > div{flex:1;min-width:0}
+.trade-row-body small{
+  display:block;font-size:10.5px;color:var(--ink-2);font-weight:600;margin-top:6px;
+}
+.trade-thumb{
+  width:34px;height:34px;border-radius:9px;background:var(--pastel);
+  border:1.5px solid var(--rc);display:inline-grid;place-items:center;
+  vertical-align:middle;margin:2px;
+}
+.trade-thumb svg{width:26px;height:26px}
+.trade-row .trade-arrow{padding:0;font-size:16px;flex-shrink:0;color:var(--ink-3)}
+.trade-row-actions{display:flex;gap:8px;margin-top:12px}
+.trade-row-actions .btn{flex:1;min-height:42px;font-size:13px}
+
+/* custom-amt inside trades: tighter */
+.custom-amt.slim{padding:7px 10px;margin-bottom:0}
+.custom-amt.slim span{font-size:14px}
+.custom-amt.slim input{font-size:15px;font-weight:700;box-shadow:none}
+.custom-amt.slim small{font-size:10px}
+
+@media (max-width:760px){
+  .trade-cols{grid-template-columns:1fr;gap:4px}
+  .trade-arrow{padding:6px 0;font-size:16px}
+  .trade-pick{
+    max-height:140px;grid-template-columns:repeat(auto-fill,minmax(50px,1fr));
+    padding:8px;gap:5px;
+  }
+  .pickcard{padding:3px 2px 4px;border-radius:9px}
+  .pickcard svg{max-width:38px}
+  .pickcard span{font-size:7px}
+  .trade-row-body{flex-direction:column;gap:6px}
+  .trade-row .trade-arrow{padding:2px 0}
+  .trade-thumb{width:30px;height:30px;border-radius:8px}
+  .trade-thumb svg{width:22px;height:22px}
+  .pay-sheet.wide{border-radius:22px 22px 0 0;max-height:92dvh;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+}
+@media (max-width:380px){
+  .trade-pick{grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:4px;padding:6px}
+}

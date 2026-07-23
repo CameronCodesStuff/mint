@@ -193,3 +193,40 @@ unchanged. Tap the spotlight to fast-forward.
   buy (seller gets credited in a transaction); bot listings still fill the
   gaps and follow the live economy.
 
+**Firebase console setup (one-time)**
+1. Authentication → Sign-in method → enable **Email/Password** and **Google**.
+2. Firestore → create database → rules for the prototype:
+   `allow read, write: if request.auth != null;`
+3. Realtime Database → create → rules: `{ "rules": { "avatars": { ".read": true, "$uid": { ".write": "auth.uid === $uid" } } } }`
+4. Add your GitHub Pages domain under Authentication → Authorized domains.
+
+**Security reality check**: everything runs client-side, so a motivated user
+can edit their own balance. Fine for a prototype among friends; before real
+money, route balance changes through a Cloudflare Worker with the Admin SDK
+and lock Firestore rules down to read-only for money fields.
+
+## v9 — $50 + $100 packs, trading fixes, marketplace buying
+
+**New packs**
+- Ultra Pack ($49.99): 12 cards, 14× Mythic odds vs Standard, rainbow foil on
+  a deep purple wrapper.
+- Mega Pack ($99.99): 25 cards, best odds in the game (30× Mythic, 85× Celestial,
+  150× Eternal vs Standard), triple rainbow foil on a crimson wrapper.
+
+**Trading fixes**
+- Trade composer: grid layout rebuilt — cards in a proper auto-fill grid that
+  scrolls, works on mobile with single-column stacking, picked cards get a
+  green glow + scale, cash inputs are tighter.
+- Trade execution: the Firestore transaction now correctly handles the
+  sender/receiver model — sender.give goes to receiver, receiver's get.cards
+  go to sender, cash settles on both sides. The accept button shows
+  "Processing…" and disables while running.
+- Trade inbox: cleaner card thumbnails, readable spacing, scrollable list.
+
+**Marketplace buying from real players**
+- When you buy a cloud listing (from a real seller), a Firestore transaction
+  atomically: deletes the listing, debits your balance, credits the seller,
+  adds the card to your collection — all in one atomic operation.
+- Bot listings still work as before for gap-filling.
+- The buy button properly checks if the listing still exists (handles race
+  conditions when two players try to buy the same card).
