@@ -255,3 +255,20 @@ and lock Firestore rules down to read-only for money fields.
      for auto-listed prices. Default 1.10× (slightly above market for a quick sale).
 - Auto-listed cards fire activity logs and a toast count.
 - Settings persist per-account in localStorage, reset on sign-out.
+
+## v11
+
+- **Pack art counts fixed**: Ultra shows "12 CARDS", Mega shows "25 CARDS".
+- **Tray wraps**: opened cards flow onto multiple lines (centered, scrollable
+  vertically) instead of a single off-screen horizontal strip. Spotlight card
+  stays on top via z-index.
+- **Dramatic Legendary+ reveals**: charge times scaled way up (Legendary 2.2s,
+  Mythic 3.2s, Celestial 4s, Eternal 5.5s of trembling anticipation). During
+  the charge, Legendary+ cards violently tremble, emit a massive pulsing glow,
+  and the gem spins faster. On flip: slam-bounce scale animation, double/triple
+  confetti bursts, longer screen flashes (Legendary 1.8s, Eternal 4s), bigger
+  value tags that hang longer, extended hold times, deeper bass rumble on audio.
+  Celestial gets its own toast ("Only 3 of these exist per species").
+- **Auto-sell existing collection**: when auto-list rarities are set, the
+  settings sheet shows a "List N existing [Rarity] cards now" button that
+  batch-lists all matching cards already in your collection at the markup price.

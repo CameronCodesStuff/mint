@@ -477,8 +477,8 @@ function packSVG(kind) {
   const crimp = premium ? '#c9a227' : '#8fd7b0';
   const emblemBg = premium ? '#2e2745' : '#ffffff';
   const label = premium ? '#f4d58d' : '#3aa572';
-  if (kind === 'ultra') return packSVGTier(kind, 'url(#pkUltra)', '#b48be8', '#1a1428', '#e0c6f7', 8);
-  if (kind === 'mega')  return packSVGTier(kind, 'url(#pkMega)',  '#f2799f', '#1c0f18', '#fcd9e6', 10);
+  if (kind === 'ultra') return packSVGTier(kind, 'url(#pkUltra)', '#b48be8', '#1a1428', '#e0c6f7', 12);
+  if (kind === 'mega')  return packSVGTier(kind, 'url(#pkMega)',  '#f2799f', '#1c0f18', '#fcd9e6', 25);
   const foil = premium
     ? `<path d="M14 34 L106 96 L106 116 L14 54 Z" fill="url(#pkRainbow)" opacity=".55"/>
        <path d="M14 60 L106 122 L106 132 L14 70 Z" fill="url(#pkRainbow)" opacity=".3"/>`
@@ -599,14 +599,15 @@ const Sfx = {
       epic:      [[523, .09], [659, .09], [784, .2]],
       legendary: [[523, .09], [659, .09], [784, .09], [1047, .3]],
       mythic:    [[392, .1], [523, .1], [659, .1], [784, .1], [1047, .38]],
-      celestial: [[440, .1], [554, .1], [659, .1], [880, .12], [1109, .4]],
-      eternal:   [[262, .18], [330, .14], [392, .14], [523, .16], [659, .16], [1047, .55]],
+      celestial: [[220, .2], [330, .16], [440, .14], [554, .14], [659, .14], [880, .16], [1109, .55]],
+      eternal:   [[131, .3], [196, .24], [262, .2], [330, .18], [392, .18], [523, .2], [659, .2], [1047, .7]],
     };
     (seqs[rarity] || seqs.common).forEach(([f, d], i) => {
       this.tone(f, i * 0.09, d, 0.13, 'triangle');
       if (['legendary','mythic','celestial','eternal'].includes(rarity)) this.tone(f / 2, i * 0.09, d, 0.06, 'sine');
     });
-    if (rarity === 'eternal') this.tone(65, 0, 1.2, 0.16, 'sine');
+    if (rarity === 'celestial') this.tone(55, 0, 1.5, 0.14, 'sine');
+    if (rarity === 'eternal') { this.tone(55, 0, 2.2, 0.2, 'sine'); this.tone(33, 0, 2.5, 0.12, 'sine'); }
   },
 };
 
@@ -902,7 +903,7 @@ let lastPackKey = null;
 let speedMult = 1;
 const sleep = ms => new Promise(res => setTimeout(res, ms * speedMult));
 
-const CHARGE_MS = { common: 420, rare: 620, epic: 1000, legendary: 1500, mythic: 2100, celestial: 2400, eternal: 3000 };
+const CHARGE_MS = { common: 380, rare: 550, epic: 900, legendary: 2200, mythic: 3200, celestial: 4000, eternal: 5500 };
 
 function confettiHTML() {
   return `<span class="confetti">${Array.from({ length: 16 }, () => {
@@ -976,7 +977,7 @@ function revealCardHTML(c, i, extraStyle = '') {
   </div>`;
 }
 
-const HOLD_MS = { common: 700, rare: 850, epic: 1150, legendary: 1450, mythic: 1850, celestial: 2000, eternal: 2600 };
+const HOLD_MS = { common: 600, rare: 750, epic: 1100, legendary: 2000, mythic: 2800, celestial: 3400, eternal: 4500 };
 
 async function runMobileSpotlight() {
   $('#openIntro').style.display = 'none';
@@ -1081,13 +1082,18 @@ function flipCard(card, c) {
   Sfx.reveal(r);
   if (['epic', 'legendary', 'mythic', 'celestial', 'eternal'].includes(r)) {
     card.insertAdjacentHTML('beforeend', confettiHTML());
+    if (['legendary', 'mythic', 'celestial', 'eternal'].includes(r)) card.insertAdjacentHTML('beforeend', confettiHTML());
+    if (['celestial', 'eternal'].includes(r)) card.insertAdjacentHTML('beforeend', confettiHTML());
+    card.classList.add('mega-flip');
     $('#revealRow').classList.add('shake');
-    setTimeout(() => $('#revealRow').classList.remove('shake'), 500);
+    setTimeout(() => $('#revealRow').classList.remove('shake'), 600);
   }
   const fx = { legendary: 'goldglow', mythic: 'prism', celestial: 'aurora', eternal: 'eternalflash' }[r];
   if (fx) {
     $('#revealScrim').classList.add(fx);
-    setTimeout(() => $('#revealScrim').classList.remove('goldglow', 'prism', 'aurora', 'eternalflash'), r === 'eternal' ? 2600 : 1400);
+    const dur = { legendary: 1800, mythic: 2200, celestial: 2800, eternal: 4000 }[r];
+    setTimeout(() => $('#revealScrim').classList.remove('goldglow', 'prism', 'aurora', 'eternalflash'), dur);
+    if (r === 'celestial') toast('A CELESTIAL! Only 3 of these exist per species.');
     if (r === 'eternal') toast('AN ETERNAL. One of one. It will never exist again.');
   }
 }
@@ -1436,8 +1442,33 @@ $('#markupSlider').addEventListener('input', e => {
 
 $('#settingsBtn').addEventListener('click', () => {
   renderAutolistOpts();
+  renderAutoSellBtn();
   $('#settingsScrim').classList.add('open');
 });
+
+function renderAutoSellBtn() {
+  const existing = document.getElementById('autoSellExisting');
+  if (existing) existing.remove();
+  const rarities = new Set(Settings.autoListRarities);
+  if (!rarities.size) return;
+  const count = S.collection.filter(c => rarities.has(c.rarity)).length;
+  if (!count) return;
+  const names = [...rarities].map(k => RARITIES[k].label).join(', ');
+  const btn = document.createElement('button');
+  btn.id = 'autoSellExisting';
+  btn.className = 'btn btn-dark';
+  btn.style.cssText = 'width:100%;margin-top:4px';
+  btn.innerHTML = `List ${count} existing ${names} card${count > 1 ? 's' : ''} now`;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    btn.textContent = 'Listing…';
+    await autoListCards([...S.collection]);
+    renderAutoSellBtn();
+    btn.textContent = 'Done!';
+    setTimeout(() => renderAutoSellBtn(), 1200);
+  });
+  document.querySelector('.settings-body .setting-group').appendChild(btn);
+}
 
 async function autoListCards(cards) {
   const rarities = new Set(Settings.autoListRarities);
