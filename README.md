@@ -230,3 +230,28 @@ and lock Firestore rules down to read-only for money fields.
 - Bot listings still work as before for gap-filling.
 - The buy button properly checks if the listing still exists (handles race
   conditions when two players try to buy the same card).
+
+## v10 — pack previews, reveal scaling, auto-list settings
+
+**Pack preview fix**
+- Ultra and Mega packs now render their pack art SVGs in the shop correctly
+  (the `.pack-art` container inside `.pack-visual` was missing height rules).
+- Both packs have full gradient visuals — Ultra is deep purple, Mega is crimson.
+
+**Reveal auto-fit**
+- Packs with 8+ cards (Ultra: 12, Mega: 25) now use the one-card spotlight mode
+  on ALL screen sizes (including desktop) — no zooming out. The spotlight scales
+  up on bigger screens (52vw / 320px max) and the tray + action buttons stay
+  visible and pinned.
+- Packs with ≤7 cards still use the desktop grid, but card width now auto-scales
+  based on count (162px for 3, 148 for 5, 128 for 7) via a CSS custom property.
+
+**Auto-list settings**
+- Settings gear in the header opens a sheet with two controls:
+  1. **Auto-list rarity picker**: toggle any combination of rarities (Common
+     through Eternal). Every card matching a toggled rarity gets automatically
+     listed on the market immediately after you bank a pack. "Off" clears all.
+  2. **Markup slider** (1.00× to 2.00×): multiplier applied on top of fair value
+     for auto-listed prices. Default 1.10× (slightly above market for a quick sale).
+- Auto-listed cards fire activity logs and a toast count.
+- Settings persist per-account in localStorage, reset on sign-out.

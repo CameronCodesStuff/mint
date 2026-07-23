@@ -39,6 +39,9 @@
     </div>
     <button class="btn btn-dark btn-sm" id="depositBtn">Add funds</button>
     <button class="btn btn-quiet btn-sm" id="withdrawBtn">Withdraw · Coming soon</button>
+    <button class="bell" id="settingsBtn" aria-label="Settings">
+      <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+    </button>
     <button class="bell" id="tradesBell" aria-label="Trades">
       <svg viewBox="0 0 24 24"><path d="M7 10h10M7 10l3-3M7 10l3 3M17 15H7m10 0-3-3m3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
       <span class="bell-badge" id="tradesBadge" hidden>0</span>
@@ -399,6 +402,32 @@
     </div>
     <div class="trade-summary" id="tradeSummary"></div>
     <button class="btn btn-paynow" id="tradeSend">Send trade offer</button>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="scrim" id="settingsScrim">
+  <div class="pay-sheet" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="sheet-grab"></div>
+    <div class="pay-head">
+      <span class="pay-logo">Settings</span>
+      <button class="close-x" data-close="settingsScrim" aria-label="Close">✕</button>
+    </div>
+    <div class="settings-body">
+      <div class="setting-group">
+        <h4>Auto-list cards</h4>
+        <p class="setting-desc">Automatically list every new card of a chosen rarity on the market at its default fair value.</p>
+        <div class="autolist-opts" id="autolistOpts"></div>
+      </div>
+      <div class="setting-group">
+        <h4>Auto-list markup</h4>
+        <p class="setting-desc">Price multiplier applied on top of fair value when auto-listing.</p>
+        <div class="markup-row">
+          <input type="range" id="markupSlider" min="100" max="200" step="5" value="110">
+          <span id="markupLabel">1.1×</span>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

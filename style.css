@@ -1261,3 +1261,89 @@ input[type="search"]{width:190px}
 @media (max-width:380px){
   .trade-pick{grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:4px;padding:6px}
 }
+
+/* ============ v10: pack previews fix, reveal scaling, settings ============ */
+
+/* pack-visual fix: Ultra and Mega need the pack-art treatment too */
+.pack-visual .pack-art{display:grid;place-items:center;height:100%;width:100%}
+
+/* reveal card width driven by JS custom property */
+.reveal-card{width:var(--revealCardW, 162px)}
+
+/* spotlight card sizing: larger on bigger phones */
+@media (min-width:420px) and (max-width:760px){
+  .spotlight .reveal-card{width:min(72vw,300px)}
+}
+@media (min-width:760px){
+  .spotlight .reveal-card{width:min(52vw,320px)}
+}
+
+/* settings sheet */
+.settings-body{display:flex;flex-direction:column;gap:18px}
+.setting-group h4{font-size:14px;font-weight:800;margin-bottom:4px}
+.setting-desc{font-size:12.5px;color:var(--ink-2);line-height:1.4;margin-bottom:10px}
+.autolist-opts{display:flex;flex-wrap:wrap;gap:7px}
+.al-chip{
+  display:inline-flex;align-items:center;gap:6px;
+  border:1.5px solid var(--hairline);border-radius:99px;padding:8px 14px;
+  font-size:12.5px;font-weight:700;color:var(--ink-2);background:#fff;
+  transition:border-color .15s,background .15s,color .15s,box-shadow .15s;
+}
+.al-chip:hover{border-color:color-mix(in srgb,var(--alc,var(--ink-3)) 50%,var(--hairline))}
+.al-chip.on{
+  border-color:var(--alc,var(--green));color:var(--ink);
+  background:color-mix(in srgb,var(--alc,var(--green)) 10%,#fff);
+  box-shadow:0 0 10px color-mix(in srgb,var(--alc,var(--green)) 25%,transparent);
+}
+.al-dot{
+  width:8px;height:8px;border-radius:99px;
+  background:var(--alc,var(--ink-3));opacity:.5;
+  transition:opacity .15s,transform .15s;
+}
+.al-chip.on .al-dot{opacity:1;transform:scale(1.2)}
+.off-chip{--alc:var(--ink-3)}
+.markup-row{
+  display:flex;align-items:center;gap:14px;
+}
+.markup-row input[type="range"]{
+  flex:1;-webkit-appearance:none;appearance:none;height:6px;border-radius:99px;
+  background:linear-gradient(90deg,var(--green),var(--amber));outline:none;
+}
+.markup-row input[type="range"]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:22px;height:22px;border-radius:99px;
+  background:#fff;border:2px solid var(--ink);box-shadow:var(--shadow-sm);cursor:pointer;
+}
+.markup-row span{
+  font-size:15px;font-weight:800;font-variant-numeric:tabular-nums;
+  min-width:44px;text-align:right;
+}
+
+/* mobile spotlight: also use for big desktop packs */
+@media (min-width:760px){
+  .reveal-stage.spot-mode{
+    display:flex;flex-direction:column;height:80vh;max-height:80vh;
+    align-items:center;justify-content:center;
+  }
+  .reveal-stage.spot-mode .spotlight{
+    display:grid;place-items:center;flex:1 1 auto;min-height:0;padding:12px;
+  }
+  .reveal-stage.spot-mode .reveal-row{display:none}
+  .reveal-stage.spot-mode .opened-tray{
+    display:flex;gap:10px;flex-shrink:0;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    padding:8px 14px 10px;min-height:70px;align-items:center;scrollbar-width:none;
+  }
+  .reveal-stage.spot-mode .opened-tray::-webkit-scrollbar{display:none}
+  .reveal-stage.spot-mode .tray-card{
+    width:56px;height:56px;border-radius:14px;flex:0 0 auto;display:grid;place-items:center;
+    background:var(--pastel);border:2px solid var(--rc);
+    box-shadow:0 0 10px color-mix(in srgb,var(--rc) 40%,transparent);
+    animation:trayPop .3s cubic-bezier(.2,.8,.3,1.3) both;
+  }
+  .reveal-stage.spot-mode .tray-card svg{width:88%;height:88%}
+  .reveal-stage.spot-mode .reveal-summary{flex-shrink:0;padding:8px 20px 4px}
+  .reveal-stage.spot-mode .reveal-actions{
+    flex-shrink:0;display:flex;gap:10px;padding:10px 20px 16px;
+    justify-content:center;
+  }
+  .reveal-stage.spot-mode .reveal-actions .btn{min-width:180px}
+}

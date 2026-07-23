@@ -1009,7 +1009,7 @@ async function runMobileSpotlight() {
 }
 
 function autoReveal() {
-  if (isMobile()) return runMobileSpotlight();
+  if (isMobile() || pendingPack.length > 7) return runMobileSpotlight();
   $('#openIntro').style.display = 'none';
   const stage = $('#revealStage');
   stage.classList.add('on');
@@ -1030,6 +1030,10 @@ function autoReveal() {
   }).join('');
   // tap anywhere in the row to fast-forward the drama
   $('#revealRow').onclick = () => { speedMult = 0.25; };
+  // auto-scale card width based on count
+  const count = pendingPack.length;
+  const cardW = count <= 3 ? 162 : count <= 5 ? 148 : count <= 7 ? 128 : 110;
+  document.documentElement.style.setProperty('--revealCardW', cardW + 'px');
   runFlipSequence();
 }
 
@@ -1108,8 +1112,10 @@ function bankPack() {
   S.collection.push(...pendingPack);
   const best = pendingPack.reduce((a, b) => RARITIES[b.rarity].value > RARITIES[a.rarity].value ? b : a);
   toast(`${pendingPack.length} critters minted — best pull: ${best.name} (${RARITIES[best.rarity].label})`);
+  const pulled = [...pendingPack];
   pendingPack = null;
   renderAll();
+  setTimeout(() => autoListCards(pulled), 600);
 }
 
 $('#revealDone').addEventListener('click', () => {
@@ -1371,6 +1377,92 @@ $('#marketSearch').addEventListener('input', renderMarket);
 $('#speciesFilter').addEventListener('change', renderMarket);
 
 /* ---------- boot ---------- */
+
+/* ---------- settings: auto-list ---------- */
+
+const Settings = {
+  KEY_PREFIX: 'mint_settings_',
+  _data: null,
+  load() {
+    if (this._data) return this._data;
+    const uid = FBUser?.uid || 'anon';
+    try { this._data = JSON.parse(localStorage.getItem(this.KEY_PREFIX + uid)) || {}; }
+    catch { this._data = {}; }
+    return this._data;
+  },
+  save() {
+    const uid = FBUser?.uid || 'anon';
+    try { localStorage.setItem(this.KEY_PREFIX + uid, JSON.stringify(this._data)); } catch {}
+  },
+  get autoListRarities() { return this.load().autoList || []; },
+  set autoListRarities(arr) { this.load().autoList = arr; this.save(); },
+  get markup() { return this.load().markup ?? 110; },
+  set markup(v) { this.load().markup = v; this.save(); },
+};
+
+function renderAutolistOpts() {
+  const active = new Set(Settings.autoListRarities);
+  const keys = Object.keys(RARITIES);
+  $('#autolistOpts').innerHTML = keys.map(k => {
+    const r = RARITIES[k];
+    const on = active.has(k);
+    return `<button class="al-chip${on ? ' on' : ''}" data-al-rarity="${k}" style="--alc:${r.color}">
+      <span class="al-dot"></span>${r.label}
+    </button>`;
+  }).join('') + '<button class="al-chip off-chip' + (active.size === 0 ? ' on' : '') + '" data-al-rarity="none"><span class="al-dot"></span>Off</button>';
+  $('#markupSlider').value = Settings.markup;
+  $('#markupLabel').textContent = (Settings.markup / 100).toFixed(2) + '\u00d7';
+}
+
+document.addEventListener('click', e => {
+  const al = e.target.closest('[data-al-rarity]');
+  if (!al) return;
+  const r = al.dataset.alRarity;
+  if (r === 'none') {
+    Settings.autoListRarities = [];
+  } else {
+    const cur = new Set(Settings.autoListRarities);
+    cur.has(r) ? cur.delete(r) : cur.add(r);
+    Settings.autoListRarities = [...cur];
+  }
+  renderAutolistOpts();
+});
+
+$('#markupSlider').addEventListener('input', e => {
+  Settings.markup = parseInt(e.target.value);
+  $('#markupLabel').textContent = (Settings.markup / 100).toFixed(2) + '\u00d7';
+  Settings.save();
+});
+
+$('#settingsBtn').addEventListener('click', () => {
+  renderAutolistOpts();
+  $('#settingsScrim').classList.add('open');
+});
+
+async function autoListCards(cards) {
+  const rarities = new Set(Settings.autoListRarities);
+  if (!rarities.size || !FBUser) return;
+  const markup = Settings.markup / 100;
+  const toList = cards.filter(c => rarities.has(c.rarity));
+  for (const c of toList) {
+    const price = round2(fairValue(c) * markup);
+    const idx = S.collection.findIndex(x => x.id === c.id);
+    if (idx === -1) continue;
+    S.collection.splice(idx, 1);
+    try {
+      await addDoc(fsCollection(db, 'market'), {
+        creature: c, price, sellerUid: FBUser.uid, sellerName: Me.username, createdAt: Date.now(),
+      });
+      log('\u25a4', 'Auto-listed ' + c.name, money(price), 0);
+    } catch {
+      S.collection.push(c);
+    }
+  }
+  if (toList.length) {
+    toast('Auto-listed ' + toList.length + ' card' + (toList.length > 1 ? 's' : '') + ' on the market');
+    renderAll();
+  }
+}
 
 /* ============================================================
    ACCOUNTS · PROFILES · TRADING · LEADERBOARDS  (Firebase)
@@ -1824,6 +1916,7 @@ async function ensureUserDoc(user) {
 
 onAuthStateChanged(auth, async user => {
   FBUser = user;
+  Settings._data = null;
   if (!user) {
     Me = null;
     $('#authScreen').classList.remove('leaving');
